@@ -1,41 +1,45 @@
-import type { Trip } from "@/lib/types";
+import type { DeferredTrip, Trip } from "@/lib/types";
 
-/**
- * 用户的 2026 年初心愿初稿：
- * 12 天年假 + 法定假期，4 个心愿（樱花/极光/胡杨/天池）+ 1 个候选（鲸）。
- * 综合 Agent 在 act-3 给出权衡：保京都樱花 + 冰岛极光，胡杨挪到次年，长白山放进端午小窗口。
- */
-export const INITIAL_TRIPS: Trip[] = [
+export const DEFAULT_PTO_DAYS = 12;
+export const DEFAULT_BUDGET_CNY = 28000;
+
+export const DEMO_TRIPS: Trip[] = [
   {
     destinationId: "kyoto-sakura",
     startMonth: 4,
     days: 6,
     ptoDays: 3,
-    holidayLeveraged: 3, // clear-tomb 拼假
+    holidayLeveraged: 3,
     priority: 1,
+    estimatedBudget: 4200,
+    reason: "清明前后可用较少年假覆盖花期窗口。",
+    reasonEn: "The Qingming window can cover the bloom season with limited PTO.",
   },
   {
     destinationId: "changbai-tianchi",
-    startMonth: 6,
+    startMonth: 7,
     days: 4,
     ptoDays: 1,
-    holidayLeveraged: 3, // 端午
+    holidayLeveraged: 3,
     priority: 3,
+    estimatedBudget: 2100,
+    reason: "端午小长假可以做一次低成本补充旅行。",
+    reasonEn: "A small Dragon Boat holiday window can support a low-cost trip.",
   },
   {
     destinationId: "iceland-aurora",
     startMonth: 2,
     days: 8,
     ptoDays: 6,
-    holidayLeveraged: 2, // 春节尾
+    holidayLeveraged: 2,
     priority: 2,
+    estimatedBudget: 7600,
+    reason: "冬季极光窗口适合用春节尾段拼假。",
+    reasonEn: "The winter aurora window works with a Spring Festival PTO extension.",
   },
 ];
 
-/**
- * 综合 Agent 权衡之后被「挪到次年」的心愿，UI 上灰显示。
- */
-export const DEFERRED_TRIPS: Trip[] = [
+export const DEMO_DEFERRED_TRIPS: DeferredTrip[] = [
   {
     destinationId: "xinjiang-poplar",
     startMonth: 10,
@@ -43,8 +47,11 @@ export const DEFERRED_TRIPS: Trip[] = [
     ptoDays: 5,
     holidayLeveraged: 0,
     priority: 4,
+    estimatedBudget: 3600,
+    reason: "秋色窗口短，但与国庆预算和假期资源竞争。",
+    reasonEn: "The autumn window is short but competes with National Day resources.",
+    deferToYear: 2027,
+    deferReason: "剩余年假不足，且年度预算已接近上限。",
+    deferReasonEn: "Remaining PTO is insufficient and the annual budget is close to the cap.",
   },
 ];
-
-export const TOTAL_PTO = 12;
-export const BUDGET_CNY = 28000;

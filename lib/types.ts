@@ -1,18 +1,24 @@
+export type Lang = "zh" | "en";
+
 export type Maturity = "sketched" | "refining" | "ready";
 
-export type ClockKind = "experience" | "price";
+export type WishlistPriorityLabel = "必去" | "想去" | "随缘";
+
+export interface WishlistItem {
+  id: string;
+  label: string;
+  priorityLabel: WishlistPriorityLabel;
+  priorityScore: 1 | 2 | 3;
+  source: "user" | "inspiration" | "legacy";
+}
 
 export interface PeakProbabilityPoint {
-  /** ISO date, e.g. "2026-03-22" */
   date: string;
-  /** 0–1 probability of the peak experience happening on this date */
   p: number;
 }
 
 export interface PriceCurvePoint {
-  /** days before departure */
   t: number;
-  /** historical avg price in CNY */
   price: number;
 }
 
@@ -22,52 +28,81 @@ export interface Destination {
   city: string;
   country: string;
   experience: string;
+  experienceEn: string;
   experienceEmoji: string;
-  /** central month index (1–12) of peak season */
   peakMonth: number;
-  /** width of remote-range in days when shown at T-∞ */
+  bestMonths: number[];
   remoteRangeDays: number;
-  /** width of refined-range in days at ~T-60 */
   refinedRangeDays: number;
-  /** the eventual confirmed window in days at T-14 */
   confirmedRangeDays: number;
-  /** probability curve across days near peakMonth */
   peakCurve: PeakProbabilityPoint[];
-  /** historical price curve (CNY round-trip), indexed by days-before-departure */
   priceCurve: PriceCurvePoint[];
-  /** miss/扑空 rate at remote / refined / confirmed phases */
   missRate: { sketched: number; refining: number; ready: number };
-  /** 1-line story hook for demo (from PRD) */
   story: string;
-  /** ribbon color (we keep the brand monochrome, so this just tints the band slightly) */
+  storyEn: string;
   tint: "aurora" | "ink" | "rose" | "amber" | "emerald" | "indigo";
-  /** uses live NOAA data? */
   liveData?: boolean;
 }
 
 export interface Trip {
   destinationId: string;
-  /** start month index 1–12, year 2026 */
   startMonth: number;
-  /** length in days */
+  startDate?: string;
+  endDate?: string;
   days: number;
-  /** PTO days used (vs holidays leveraged) */
   ptoDays: number;
-  /** holiday days leveraged via 拼假 */
   holidayLeveraged: number;
-  /** monotonic priority for the 组合优化 narrative */
   priority: number;
+  estimatedBudget: number;
+  reason: string;
+  reasonEn: string;
+  wishlistLabel?: string;
+  wishlistPriorityLabel?: WishlistPriorityLabel;
+  wishlistPriorityScore?: 1 | 2 | 3;
 }
 
-export type ViewMode = "year" | "trip";
+export interface DeferredTrip extends Trip {
+  deferToYear: number;
+  deferReason: string;
+  deferReasonEn: string;
+}
+
+export interface PlanProfile {
+  ptoDays: number;
+  annualBudget: number;
+  tripCount: number;
+  wishlist: string;
+  wishlistItems?: WishlistItem[];
+  averageTripBudget: number;
+  unavailableMonths: number[];
+  unavailableDates?: string[];
+  unavailableDateNotes?: DateNote[];
+}
+
+export interface DateNote {
+  id: string;
+  date: string;
+  label: string;
+  source: "user" | "history";
+}
+
+export interface AgentFinding {
+  agent: "timing" | "holiday" | "price" | "combined";
+  text: string;
+  textEn: string;
+}
 
 export interface AgentStep {
-  /** Which agent this step belongs to */
   agent: "timing" | "holiday" | "price" | "combined";
-  /** Plain-language thinking content */
   text: string;
-  /** Optional structured data the panel can render */
   evidence?: string;
-  /** ms to dwell on this step during playback */
   dwellMs: number;
+}
+
+export interface GeneratedPlan {
+  profile: PlanProfile;
+  trips: Trip[];
+  deferredTrips: DeferredTrip[];
+  findings: AgentFinding[];
+  generatedBy: "local" | "llm";
 }

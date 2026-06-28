@@ -8,89 +8,181 @@ import YearView from "@/components/YearView";
 import TripView from "@/components/TripView";
 import ChatOverlay from "@/components/ChatOverlay";
 import PriceAlert from "@/components/PriceAlert";
-import { INITIAL_TRIPS } from "@/data/plan";
+import MaturitySummary from "@/components/MaturitySummary";
+import type {
+  AgentFinding,
+  DeferredTrip,
+  GeneratedPlan,
+  Lang,
+  PlanProfile,
+  Trip,
+  WishlistItem,
+} from "@/lib/types";
 import type { WarpStop } from "@/lib/time";
 
+const PLAN_KEY = "aurora.plan.v1";
+const LANG_KEY = "aurora.lang.v1";
+
 export default function Home() {
+  const [lang, setLang] = useState<Lang>("zh");
   const [warp, setWarp] = useState<WarpStop>("year-start");
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [firstVisit, setFirstVisit] = useState(true);
+  const [plannerOpen, setPlannerOpen] = useState(false);
+  const [plannerSeed, setPlannerSeed] = useState<WishlistItem[]>([]);
+  const [profile, setProfile] = useState<PlanProfile | null>(null);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [deferredTrips, setDeferredTrips] = useState<DeferredTrip[]>([]);
+  const [findings, setFindings] = useState<AgentFinding[]>([]);
+  const hasPlan = trips.length > 0;
 
-  // First-visit auto-opens Chat (PRD §7: 首次使用 → Chat View)
   useEffect(() => {
-    const t = setTimeout(() => {
-      if (firstVisit) {
-        setChatOpen(true);
-        setFirstVisit(false);
-      }
-    }, 600);
-    return () => clearTimeout(t);
-  }, [firstVisit]);
+    const savedLang = window.localStorage.getItem(LANG_KEY);
+    if (savedLang === "zh" || savedLang === "en") setLang(savedLang);
 
-  // Cmd+K opens chat anywhere
+    const savedPlan = window.localStorage.getItem(PLAN_KEY);
+    if (savedPlan) {
+      try {
+        const plan = JSON.parse(savedPlan) as GeneratedPlan;
+        setProfile(plan.profile);
+        setTrips(plan.trips ?? []);
+        setDeferredTrips(plan.deferredTrips ?? []);
+        setFindings(plan.findings ?? []);
+      } catch {
+        window.localStorage.removeItem(PLAN_KEY);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(LANG_KEY, lang);
+  }, [lang]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setChatOpen(true);
+        setPlannerSeed([]);
+        setPlannerOpen(true);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  function openPlanner(seed: WishlistItem[] = []) {
+    setPlannerSeed(seed);
+    setPlannerOpen(true);
+  }
+
+  function applyPlan(plan: GeneratedPlan) {
+    setProfile(plan.profile);
+    setTrips(plan.trips);
+    setDeferredTrips(plan.deferredTrips);
+    setFindings(plan.findings);
+    setSelectedTrip(null);
+    setWarp("year-start");
+    setPlannerSeed([]);
+    window.localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
+  }
+
+  function clearPlan() {
+    setProfile(null);
+    setTrips([]);
+    setDeferredTrips([]);
+    setFindings([]);
+    setSelectedTrip(null);
+    setWarp("year-start");
+    window.localStorage.removeItem(PLAN_KEY);
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-white via-ink-50/40 to-white">
       <TopBar
-        warp={warp}
-        trips={INITIAL_TRIPS}
-        onOpenChat={() => setChatOpen(true)}
+        lang={lang}
+        onOpenPlanner={() => openPlanner()}
+        onToggleLanguage={() => setLang((value) => (value === "zh" ? "en" : "zh"))}
       />
 
-      <div className="mx-auto max-w-[1240px] px-8 py-8 space-y-6">
-        {/* Hero */}
-        <section className="flex items-end justify-between">
+      <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-8 space-y-6">
+        <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
             <div className="text-[11px] uppercase tracking-[0.22em] text-ink-500 font-medium">
-              Plan once · Refine all year
+              {lang === "zh" ? "Plan once · Refine all year" : "Plan once · Refine all year"}
             </div>
-            <h1 className="text-[32px] font-semibold tracking-tight text-ink-900 mt-2 leading-tight">
-              你的 2026 旅行，会随时间
-              <span className="text-aurora-700"> 收敛置信度</span>。
+            <h1 className="text-[30px] sm:text-[34px] font-semibold tracking-tight text-ink-900 mt-2 leading-tight">
+              {lang === "zh" ? (
+                <>
+                  你的旅行计划，会随时间
+                  <span className="text-aurora-700"> 长大。</span>
+                </>
+              ) : (
+                <>
+                  Your travel plan should
+                  <span className="text-aurora-700"> mature over time.</span>
+                </>
+              )}
             </h1>
-            <p className="text-[13px] text-ink-600 mt-2 max-w-xl leading-relaxed">
-              远期给概率区间，临近才给确定日。订票时钟提前 12 个月可靠，体验时钟 T-14 / T-3 才准 — Aurora 把两者分开诚实告诉你。
+            <p className="text-[13px] text-ink-600 mt-2 max-w-2xl leading-relaxed">
+              {lang === "zh"
+                ? "先说出心愿，再给每个心愿标注必去、想去或随缘。Aurora 会按季节、天气、价格和假期资源生成年度计划，资源不足的自动推迟到下一年。"
+                : "Start with wishes, then mark each as must-go, want-to-go, or optional. Aurora plans around seasonality, weather, prices, and PTO, and defers what cannot fit."}
             </p>
           </div>
+          {hasPlan && (
+            <button
+              onClick={clearPlan}
+              className="self-start lg:self-auto rounded-full border hairline bg-white px-4 py-2 text-[12px] text-ink-600 hover:bg-ink-50"
+            >
+              {lang === "zh" ? "清空计划" : "Clear plan"}
+            </button>
+          )}
         </section>
 
-        <TimeWarp warp={warp} onChange={setWarp} />
-        <PriceAlert warp={warp} />
-        <Stats />
+        <TimeWarp lang={lang} warp={warp} disabled={!hasPlan} onChange={setWarp} />
+        <MaturitySummary lang={lang} warp={warp} trips={trips} />
+        <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
+        <Stats lang={lang} profile={profile} trips={trips} deferredTrips={deferredTrips} />
 
-        {/* main view region: Year by default, Trip when selected */}
         {selectedTrip ? (
           <TripView
+            lang={lang}
             destinationId={selectedTrip}
             warp={warp}
+            trips={trips}
+            profile={profile}
             onBack={() => setSelectedTrip(null)}
-            onOpenChat={() => setChatOpen(true)}
+            onOpenPlanner={() => openPlanner()}
           />
         ) : (
-          <YearView warp={warp} onSelectTrip={setSelectedTrip} />
+          <YearView
+            lang={lang}
+            warp={warp}
+            trips={trips}
+            deferredTrips={deferredTrips}
+            onSelectTrip={setSelectedTrip}
+            onOpenPlanner={() => openPlanner()}
+            onStartWithWishlist={openPlanner}
+          />
         )}
 
         <footer className="pt-8 pb-2 text-center text-[11px] text-ink-400 tracking-wide">
-          Aurora · Travel by timing, not by luck. ·{" "}
-          <kbd className="px-1.5 py-0.5 rounded border hairline text-[10px]">
-            Cmd/Ctrl + K
-          </kbd>{" "}
-          to chat
+          Aurora · {lang === "zh" ? "按时机规划旅行，而不是靠运气。" : "Travel by timing, not by luck."} ·{" "}
+          <kbd className="px-1.5 py-0.5 rounded border hairline text-[10px]">Cmd/Ctrl + K</kbd>
         </footer>
       </div>
 
-      <ChatOverlay open={chatOpen} onClose={() => setChatOpen(false)} />
+      <ChatOverlay
+        open={plannerOpen}
+        lang={lang}
+        initialProfile={profile}
+        seedWishlistItems={plannerSeed}
+        findings={findings}
+        onClose={() => {
+          setPlannerOpen(false);
+          setPlannerSeed([]);
+        }}
+        onPlanGenerated={applyPlan}
+      />
     </main>
   );
 }
