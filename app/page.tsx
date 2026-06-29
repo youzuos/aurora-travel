@@ -40,6 +40,7 @@ export default function Home() {
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [companionState, setCompanionState] = useState<CompanionState>(() => createDefaultCompanionState());
+  const [companionStateReady, setCompanionStateReady] = useState(false);
   const [companionChatOpen, setCompanionChatOpen] = useState(false);
   const [plannerSeed, setPlannerSeed] = useState<WishlistItem[]>([]);
   const [profile, setProfile] = useState<PlanProfile | null>(null);
@@ -67,6 +68,7 @@ export default function Home() {
 
     const savedCompanion = parseCompanionState(window.localStorage.getItem(COMPANION_STORAGE_KEY));
     setCompanionState(maybeAdvanceCompanionLocation(savedCompanion ?? createDefaultCompanionState()));
+    setCompanionStateReady(true);
   }, []);
 
   useEffect(() => {
@@ -74,8 +76,9 @@ export default function Home() {
   }, [lang]);
 
   useEffect(() => {
+    if (!companionStateReady) return;
     window.localStorage.setItem(COMPANION_STORAGE_KEY, serializeCompanionState(companionState));
-  }, [companionState]);
+  }, [companionState, companionStateReady]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -162,7 +165,9 @@ export default function Home() {
           )}
         </section>
 
-        <CompanionStatus lang={lang} state={companionState} onOpen={() => setCompanionChatOpen(true)} />
+        {companionStateReady ? (
+          <CompanionStatus lang={lang} state={companionState} onOpen={() => setCompanionChatOpen(true)} />
+        ) : null}
         <TimeWarp lang={lang} warp={warp} disabled={!hasPlan} onChange={setWarp} />
         <MaturitySummary lang={lang} warp={warp} trips={trips} />
         <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
@@ -197,7 +202,7 @@ export default function Home() {
       </div>
 
       {companionChatOpen && null}
-      <CompanionOnboarding lang={lang} state={companionState} onSelect={chooseCompanion} />
+      {companionStateReady ? <CompanionOnboarding lang={lang} state={companionState} onSelect={chooseCompanion} /> : null}
 
       <ChatOverlay
         open={plannerOpen}
