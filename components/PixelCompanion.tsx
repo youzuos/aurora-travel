@@ -22,7 +22,7 @@ type Palette = {
 };
 
 const PALETTES: Record<AnimalKind, Palette> = {
-  frog: { main: "#66c777", dark: "#226b48", light: "#bdf4ba", belly: "#dff8c9", cheek: "#f6a2a2" },
+  frog: { main: "#45c96a", dark: "#176b3a", light: "#d8ffd2", belly: "#dff8c9", cheek: "#f58f9d" },
   fox: { main: "#ef8842", dark: "#7b3f28", light: "#ffe0b5", belly: "#fff0d2", cheek: "#f6a2a2", tail: "#f3a04f" },
   cat: { main: "#8b929f", dark: "#3f4856", light: "#dce3eb", belly: "#eef2f5", cheek: "#ee9ebe", tail: "#747d8c" },
   dog: { main: "#bf8556", dark: "#684632", light: "#f1d0a9", belly: "#f5dec2", cheek: "#ef9b8e", tail: "#9a633f" },
@@ -50,10 +50,14 @@ function ears(animal: AnimalKind, p: Palette) {
   if (animal === "frog") {
     return (
       <>
-        <Pixel x={10} y={10} w={10} h={9} fill={p.main} />
-        <Pixel x={44} y={10} w={10} h={9} fill={p.main} />
-        <Pixel x={13} y={12} w={4} h={4} fill={p.light} />
-        <Pixel x={47} y={12} w={4} h={4} fill={p.light} />
+        <Pixel x={9} y={7} w={13} h={12} fill={p.main} />
+        <Pixel x={42} y={7} w={13} h={12} fill={p.main} />
+        <Pixel x={11} y={9} w={9} h={8} fill={p.light} />
+        <Pixel x={44} y={9} w={9} h={8} fill={p.light} />
+        <Pixel x={14} y={11} w={4} h={4} fill={p.dark} />
+        <Pixel x={47} y={11} w={4} h={4} fill={p.dark} />
+        <Pixel x={15} y={12} w={1} h={1} fill="#ffffff" />
+        <Pixel x={48} y={12} w={1} h={1} fill="#ffffff" />
       </>
     );
   }
@@ -69,19 +73,26 @@ function ears(animal: AnimalKind, p: Palette) {
   }
   if (animal === "penguin") return null;
 
-  const leftEarX = animal === "dog" ? 12 : 13;
-  const rightEarX = animal === "dog" ? 45 : 43;
-  const earH = animal === "dog" ? 13 : 10;
+  if (animal === "dog") {
+    return (
+      <>
+        <Pixel x={9} y={16} w={8} h={18} fill={p.dark} />
+        <Pixel x={47} y={16} w={8} h={18} fill={p.dark} />
+        <Pixel x={10} y={27} w={6} h={8} fill={p.dark} />
+        <Pixel x={48} y={27} w={6} h={8} fill={p.dark} />
+      </>
+    );
+  }
+
+  const leftEarX = animal === "bear" ? 11 : 13;
+  const rightEarX = animal === "bear" ? 44 : 43;
+  const earH = animal === "bear" ? 11 : 10;
   return (
     <>
       <Pixel x={leftEarX} y={10} w={9} h={earH} fill={animal === "panda" ? p.dark : p.main} />
       <Pixel x={rightEarX} y={10} w={9} h={earH} fill={animal === "panda" ? p.dark : p.main} />
-      {animal !== "dog" ? (
-        <>
-          <Pixel x={leftEarX + 3} y={13} w={3} h={4} fill={p.light} />
-          <Pixel x={rightEarX + 3} y={13} w={3} h={4} fill={p.light} />
-        </>
-      ) : null}
+      <Pixel x={leftEarX + 3} y={13} w={3} h={4} fill={p.light} />
+      <Pixel x={rightEarX + 3} y={13} w={3} h={4} fill={p.light} />
     </>
   );
 }
@@ -90,9 +101,9 @@ function tail(animal: AnimalKind, p: Palette) {
   if (animal === "fox") {
     return (
       <>
-        <Pixel x={49} y={35} w={8} h={8} fill={p.tail ?? p.main} />
-        <Pixel x={54} y={31} w={6} h={8} fill={p.tail ?? p.main} />
-        <Pixel x={57} y={29} w={4} h={5} fill={p.light} />
+        <Pixel x={47} y={34} w={10} h={10} fill={p.tail ?? p.main} />
+        <Pixel x={53} y={28} w={8} h={11} fill={p.tail ?? p.main} />
+        <Pixel x={57} y={26} w={5} h={7} fill={p.light} />
       </>
     );
   }
@@ -125,6 +136,19 @@ function face(animal: AnimalKind, p: Palette, sleepy: boolean) {
     </>
   );
 
+  if (animal === "frog") {
+    return (
+      <>
+        <Pixel x={18} y={27} w={3} h={2} fill={p.dark} />
+        <Pixel x={43} y={27} w={3} h={2} fill={p.dark} />
+        <Pixel x={20} y={34} w={24} h={2} fill={p.dark} />
+        <Pixel x={22} y={36} w={20} h={2} fill={p.light} />
+        <Pixel x={18} y={31} w={6} h={4} fill={p.cheek} />
+        <Pixel x={40} y={31} w={6} h={4} fill={p.cheek} />
+      </>
+    );
+  }
+
   if (animal === "penguin") {
     return (
       <>
@@ -153,6 +177,8 @@ function face(animal: AnimalKind, p: Palette, sleepy: boolean) {
       <>
         <Pixel x={18} y={25} w={28} h={13} fill={p.light} />
         <Pixel x={28} y={30} w={9} h={7} fill={p.light} />
+        <Pixel x={15} y={19} w={8} h={7} fill={p.dark} />
+        <Pixel x={42} y={19} w={8} h={7} fill={p.dark} />
         {eyes}
         <Pixel x={31} y={32} w={4} h={3} fill={p.dark} />
       </>
@@ -180,24 +206,50 @@ function face(animal: AnimalKind, p: Palette, sleepy: boolean) {
       <Pixel x={31} y={31} w={4} h={3} fill={p.dark} />
       <Pixel x={20} y={34} w={5} h={3} fill={p.cheek} />
       <Pixel x={40} y={34} w={5} h={3} fill={p.cheek} />
-      {animal === "frog" ? (
-        <>
-          <Pixel x={17} y={29} w={2} h={2} fill={p.dark} />
-          <Pixel x={46} y={29} w={2} h={2} fill={p.dark} />
-        </>
-      ) : null}
     </>
   );
+}
+
+function speciesMarks(animal: AnimalKind, p: Palette) {
+  if (animal === "rabbit") {
+    return (
+      <>
+        <Pixel x={28} y={34} w={3} h={2} fill={p.dark} />
+        <Pixel x={34} y={34} w={3} h={2} fill={p.dark} />
+      </>
+    );
+  }
+  if (animal === "bear") {
+    return (
+      <>
+        <Pixel x={27} y={31} w={11} h={8} fill={p.light} />
+        <Pixel x={31} y={33} w={4} h={3} fill={p.dark} />
+      </>
+    );
+  }
+  if (animal === "panda") {
+    return (
+      <>
+        <Pixel x={50} y={49} w={8} h={4} fill={p.dark} />
+        <Pixel x={53} y={53} w={5} h={3} fill={p.main} />
+      </>
+    );
+  }
+  return null;
 }
 
 function prop(action: CompanionAction) {
   if (action === "photo") {
     return (
       <>
-        <Pixel x={38} y={40} w={15} h={11} fill="#344250" />
-        <Pixel x={42} y={37} w={7} h={4} fill="#344250" />
-        <Pixel x={43} y={43} w={5} h={5} fill="#bfeaff" />
-        <Pixel x={52} y={33} w={5} h={5} fill="#f7d65c" className="pixel-flash" />
+        <Pixel x={32} y={36} w={24} h={17} fill="#1f2a36" />
+        <Pixel x={36} y={32} w={9} h={5} fill="#1f2a36" />
+        <Pixel x={45} y={34} w={5} h={2} fill="#607386" />
+        <Pixel x={39} y={40} w={11} h={11} fill="#0d1520" />
+        <Pixel x={42} y={43} w={5} h={5} fill="#9fe6ff" />
+        <Pixel x={43} y={44} w={2} h={2} fill="#ffffff" />
+        <Pixel x={53} y={38} w={3} h={4} fill="#e2edf5" />
+        <Pixel x={55} y={30} w={6} h={6} fill="#f7d65c" className="pixel-flash" />
       </>
     );
   }
@@ -273,9 +325,9 @@ export default function PixelCompanion({ character, action, label, size = "md", 
         <Pixel x={20} y={58} w={26} h={3} fill="#d6dde5" />
         {tail(character.animal, palette)}
         {ears(character.animal, palette)}
-        <Pixel x={17} y={15} w={30} h={4} fill={palette.main} />
-        <Pixel x={14} y={19} w={36} h={20} fill={palette.main} />
-        <Pixel x={17} y={39} w={30} h={4} fill={palette.main} />
+        <Pixel x={character.animal === "frog" ? 12 : 17} y={15} w={character.animal === "frog" ? 40 : 30} h={4} fill={palette.main} />
+        <Pixel x={character.animal === "frog" ? 10 : 14} y={19} w={character.animal === "frog" ? 44 : 36} h={20} fill={palette.main} />
+        <Pixel x={character.animal === "frog" ? 13 : 17} y={39} w={character.animal === "frog" ? 38 : 30} h={4} fill={palette.main} />
         {face(character.animal, palette, sleepy)}
         <Pixel x={21} y={41} w={24} h={15} fill={palette.main} />
         <Pixel x={25} y={45} w={16} h={10} fill={palette.belly} />
@@ -287,6 +339,7 @@ export default function PixelCompanion({ character, action, label, size = "md", 
         <Pixel x={15} y={41} w={9} h={4} fill={character.pixelAccent} />
         <Pixel x={46} y={41} w={8} h={11} fill="#66788a" />
         <Pixel x={48} y={43} w={4} h={6} fill="#91a7ba" />
+        {speciesMarks(character.animal, palette)}
         {prop(action)}
       </svg>
       <style jsx>{`
