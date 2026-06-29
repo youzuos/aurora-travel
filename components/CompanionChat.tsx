@@ -106,20 +106,29 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
                   {lang === "zh" ? character.nameZh : character.nameEn}
                 </div>
                 <div className="truncate text-[11px] text-ink-500">
-                  {lang === "zh" ? `正在 ${location.cityZh} 旅行` : `Traveling in ${location.cityEn}`}
+                  {lang === "zh" ? `Traveling in ${location.cityEn}` : `Traveling in ${location.cityEn}`}
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={() => onStateChange({ ...state, testMode: !state.testMode })}
+                className="inline-flex items-center gap-1 rounded-full border hairline px-3 py-1.5 text-[11px] text-ink-600 hover:bg-ink-50"
+                title="Toggle accelerated companion timing"
+              >
+                <span className="text-sm leading-none">!</span>
+                <span className="hidden sm:inline">{state.testMode ? "Fast" : "Normal"}</span>
+              </button>
+              <button
+                type="button"
                 onClick={onChangeCharacter}
                 className="rounded-full border hairline px-3 py-1.5 text-[11px] text-ink-600 hover:bg-ink-50"
               >
-                {lang === "zh" ? "换角色" : "Change"}
+                {lang === "zh" ? "Change" : "Change"}
               </button>
               <button type="button" onClick={onClose} className="text-xl leading-none text-ink-400 hover:text-ink-900">
-                ×
+                x
               </button>
             </div>
           </div>
@@ -146,7 +155,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
                     onClick={() => speak(messageText(message, lang), lang)}
                     className="mb-1 flex w-full items-center gap-2 rounded-full bg-aurora-50 px-3 py-2 text-left text-[12px] text-aurora-800"
                   >
-                    <span>▶</span>
+                    <span>&gt;</span>
                     <span>{message.voiceDurationSec ?? 8}s</span>
                   </button>
                 ) : null}
@@ -156,9 +165,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
             </div>
           ))}
 
-          {typing ? (
-            <div className="text-[12px] text-ink-400">{lang === "zh" ? "小旅伴正在打字..." : "Companion is typing..."}</div>
-          ) : null}
+          {typing ? <div className="text-[12px] text-ink-400">Companion is typing...</div> : null}
         </div>
 
         <div className="border-t hairline bg-white p-3">
@@ -169,7 +176,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
               onKeyDown={(event) => {
                 if (event.key === "Enter") send();
               }}
-              placeholder={lang === "zh" ? "问它在做什么，或说：去巴黎" : "Ask what it is doing, or say: go to Paris"}
+              placeholder="Ask what it is doing, or say: go to Paris"
               className="min-w-0 flex-1 rounded-xl border hairline bg-ink-50 px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-aurora-200"
             />
             <button
@@ -178,7 +185,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
               disabled={!draft.trim() || typing}
               className="rounded-xl bg-ink-900 px-4 py-2 text-[12px] font-medium text-white disabled:opacity-40"
             >
-              {lang === "zh" ? "发送" : "Send"}
+              Send
             </button>
           </div>
         </div>

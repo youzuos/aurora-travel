@@ -130,6 +130,7 @@ export default function Home() {
         lang={lang}
         onOpenPlanner={() => openPlanner()}
         onToggleLanguage={() => setLang((value) => (value === "zh" ? "en" : "zh"))}
+        onOpenCompanion={() => setCompanionChatOpen(true)}
       />
 
       <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-8 space-y-6">
