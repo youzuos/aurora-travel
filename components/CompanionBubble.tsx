@@ -24,6 +24,7 @@ export default function CompanionBubble({ lang, state, chatOpen, onOpen, onState
   const hideTimerRef = useRef<number | null>(null);
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
   const location = getCurrentLocation(state);
+  const characterInitial = (lang === "zh" ? character?.nameZh : character?.nameEn)?.slice(0, 1) ?? "";
 
   useEffect(() => {
     if (chatOpen) {
@@ -80,11 +81,17 @@ export default function CompanionBubble({ lang, state, chatOpen, onOpen, onState
         onClick={onOpen}
         className="flex items-center gap-3 rounded-2xl border hairline bg-white p-2 pr-3 shadow-xl transition hover:scale-[1.02]"
       >
-        <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-ink-50">
+        <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-gradient-to-br from-aurora-50 to-ink-100">
+          <span className="absolute inset-0 z-0 grid place-items-center text-[14px] font-semibold text-aurora-800">
+            {characterInitial}
+          </span>
           <img
             src={character.imageSrc}
             alt={lang === "zh" ? character.nameZh : character.nameEn}
-            className="h-full w-full object-cover"
+            className="relative z-10 h-full w-full object-cover"
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
           />
           <span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border border-white bg-emerald-500" />
         </div>

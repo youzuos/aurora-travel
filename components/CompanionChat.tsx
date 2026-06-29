@@ -39,6 +39,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
   const location = getCurrentLocation(state);
   const messages = useMemo(() => state.messageHistory.slice(-40), [state.messageHistory]);
+  const characterInitial = (lang === "zh" ? character?.nameZh : character?.nameEn)?.slice(0, 1) ?? "";
 
   useEffect(() => {
     if (!open || state.unreadCount === 0) return;
@@ -87,11 +88,19 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
         <div className="border-b hairline px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <img
-                src={character.imageSrc}
-                alt={lang === "zh" ? character.nameZh : character.nameEn}
-                className="h-10 w-10 rounded-xl object-cover"
-              />
+              <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-gradient-to-br from-aurora-50 to-ink-100">
+                <span className="absolute inset-0 z-0 grid place-items-center text-[12px] font-semibold text-aurora-800">
+                  {characterInitial}
+                </span>
+                <img
+                  src={character.imageSrc}
+                  alt={lang === "zh" ? character.nameZh : character.nameEn}
+                  className="relative z-10 h-10 w-10 object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              </div>
               <div className="min-w-0">
                 <div className="truncate text-[14px] font-semibold text-ink-900">
                   {lang === "zh" ? character.nameZh : character.nameEn}

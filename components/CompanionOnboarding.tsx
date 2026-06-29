@@ -14,6 +14,10 @@ function copy(lang: Lang, zh: string, en: string) {
   return lang === "zh" ? zh : en;
 }
 
+function characterInitial(lang: Lang, nameZh: string, nameEn: string) {
+  return copy(lang, nameZh, nameEn).slice(0, 1);
+}
+
 export default function CompanionOnboarding({ lang, state, onSelect }: Props) {
   if (state.onboardingCompleted) return null;
 
@@ -49,11 +53,14 @@ export default function CompanionOnboarding({ lang, state, onSelect }: Props) {
               onClick={() => onSelect(character.id)}
               className="group rounded-xl border hairline bg-white p-3 text-left transition hover:border-aurora-300 hover:bg-aurora-50/50"
             >
-              <div className="aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-aurora-50 to-ink-100">
+              <div className="relative aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-aurora-50 to-ink-100">
+                <span className="absolute inset-0 z-0 grid place-items-center text-[18px] font-semibold text-aurora-800">
+                  {characterInitial(lang, character.nameZh, character.nameEn)}
+                </span>
                 <img
                   src={character.imageSrc}
                   alt={copy(lang, character.nameZh, character.nameEn)}
-                  className="h-full w-full object-cover transition group-hover:scale-[1.03]"
+                  className="relative z-10 h-full w-full object-cover transition group-hover:scale-[1.03]"
                   onError={(event) => {
                     event.currentTarget.style.display = "none";
                   }}
