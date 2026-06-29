@@ -337,7 +337,7 @@ const VAGUE_DESTINATION_RULES: ReadonlyArray<{
 ];
 
 function makeId(prefix: string, now: number) {
-  return `${prefix}-${now}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${now}`;
 }
 
 export function getCharacter(id: string): CompanionCharacter {
@@ -455,7 +455,11 @@ function appendMessages(history: readonly CompanionMessage[], messages: readonly
   const merged = [...history];
 
   for (const message of messages) {
-    if (existingIds.has(message.id)) continue;
+    if (existingIds.has(message.id)) {
+      const index = merged.findIndex((item) => item.id === message.id);
+      if (index >= 0) merged[index] = message;
+      continue;
+    }
     merged.push(message);
     existingIds.add(message.id);
   }

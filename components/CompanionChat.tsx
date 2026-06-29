@@ -8,6 +8,7 @@ import {
   getCompanionAction,
   getCompanionLocalTimeInfo,
   getCurrentLocation,
+  mergeGeneratedReplyState,
   type CompanionMessage,
   type CompanionState,
 } from "@/lib/companion";
@@ -69,6 +70,7 @@ function PhotoCard({ message, lang }: { message: CompanionMessage; lang: Lang })
 
 export default function CompanionChat({ open, lang, state, onClose, onStateChange, onChangeCharacter }: Props) {
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
   const location = getCurrentLocation(state);
@@ -87,13 +89,39 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
 
   if (!open || !character) return null;
 
-  function send() {
+  async function send() {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || sending) return;
 
     setDraft("");
     const now = Date.now();
-    onStateChange((currentState) => commitCompanionUserMessage(text, currentState, lang, now));
+    const baseState = state;
+    const localState = commitCompanionUserMessage(text, baseState, lang, now);
+    onStateChange(localState);
+
+    setSending(true);
+    try {
+      const response = await fetch("/api/companion/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: text, state: baseState, lang, now }),
+      });
+      if (!response.ok) return;
+
+      const result = (await response.json()) as {
+        state?: CompanionState;
+        messages?: CompanionMessage[];
+      };
+      if (!result.state || !Array.isArray(result.messages)) return;
+
+      onStateChange((currentState) =>
+        mergeGeneratedReplyState(currentState, baseState, result.state as CompanionState, result.messages as CompanionMessage[])
+      );
+    } catch {
+      // The local reply is already committed; network or LLM failures should not block chat.
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -196,18 +224,18 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") send();
+                if (event.key === "Enter") void send();
               }}
               placeholder={lang === "zh" ? "问它在做什么，或说：去巴黎" : "Ask what it is doing, or say: go to Paris"}
               className="min-w-0 flex-1 rounded-xl border hairline bg-ink-50 px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-aurora-200"
             />
             <button
               type="button"
-              onClick={send}
-              disabled={!draft.trim()}
+              onClick={() => void send()}
+              disabled={!draft.trim() || sending}
               className="rounded-xl bg-ink-900 px-4 py-2 text-[12px] font-medium text-white disabled:opacity-40"
             >
-              {lang === "zh" ? "发送" : "Send"}
+              {sending ? (lang === "zh" ? "生成中" : "Thinking") : lang === "zh" ? "发送" : "Send"}
             </button>
           </div>
         </div>

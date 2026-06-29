@@ -82,6 +82,30 @@ runCase("reply commit merges onto latest state instead of overwriting newer chan
   assert.equal(merged.messageHistory.at(-1)?.id, replyMessage.id);
 });
 
+runCase("reply merge replaces matching local message ids with enhanced content", () => {
+  const userOnlyState = readyState({
+    messageHistory: [createAgentMessage("text", "Before leaving", "Before leaving", 1_100)],
+    statusCursor: 2,
+  });
+  const localReply = createAgentMessage("text", "Local reply", "Local reply", 1_700);
+  const enhancedReply = { ...localReply, textEn: "Enhanced reply", textZh: "增强回复" };
+  const plannedState = {
+    ...userOnlyState,
+    lastActiveAt: 1_700,
+    statusCursor: 3,
+    messageHistory: [...userOnlyState.messageHistory, enhancedReply],
+  };
+  const latestState = {
+    ...userOnlyState,
+    messageHistory: [...userOnlyState.messageHistory, localReply],
+  };
+
+  const merged = mergeGeneratedReplyState(latestState, userOnlyState, plannedState, [enhancedReply]);
+
+  assert.equal(merged.messageHistory.length, latestState.messageHistory.length);
+  assert.equal(merged.messageHistory.at(-1)?.textEn, "Enhanced reply");
+});
+
 runCase("sending a user message commits an agent response immediately", () => {
   const state = readyState({
     messageHistory: [createAgentMessage("text", "Before leaving", "Before leaving", 1_100)],
