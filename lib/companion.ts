@@ -269,6 +269,36 @@ function messageForIntent(
   );
 }
 
+function expandInteractiveReply(message: CompanionMessage, intent: Exclude<Intent, "move">): CompanionMessage {
+  if (intent === "photo" || intent === "unknown") return message;
+
+  const followUps: Record<Exclude<Intent, "move" | "photo" | "unknown">, { zh: string; en: string }> = {
+    status: {
+      zh: "我还可以给你讲刚遇到的人，或者拍一张现在看到的景色。",
+      en: "I can also tell you about someone I just met, or send a photo of what I am seeing.",
+    },
+    food: {
+      zh: "你要不要听听店里的人，还是让我拍一张吃的给你看？",
+      en: "Do you want to hear about the people in the shop, or should I send a food photo?",
+    },
+    people: {
+      zh: "我有点想继续跟着这条街走下去，也许还会碰到新的故事。",
+      en: "I kind of want to keep following this street; it feels like there may be another story ahead.",
+    },
+    scenery: {
+      zh: "如果你想看，我可以把这一幕也拍成一张照片发给你。",
+      en: "If you want, I can also turn this view into a photo card for you.",
+    },
+  };
+
+  const followUp = followUps[intent];
+  return {
+    ...message,
+    textZh: `${message.textZh} ${followUp.zh}`,
+    textEn: `${message.textEn} ${followUp.en}`,
+  };
+}
+
 export function generateCompanionReply(
   input: string,
   state: CompanionState,
@@ -317,7 +347,7 @@ export function generateCompanionReply(
   }
 
   const location = getCurrentLocation(state);
-  const reply = messageForIntent(intent, location, now + 450, state.statusCursor);
+  const reply = expandInteractiveReply(messageForIntent(intent, location, now + 450, state.statusCursor), intent);
   return {
     state: {
       ...state,
