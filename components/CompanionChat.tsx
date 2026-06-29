@@ -115,10 +115,12 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
                 type="button"
                 onClick={() => onStateChange({ ...state, testMode: !state.testMode })}
                 className="inline-flex items-center gap-1 rounded-full border hairline px-3 py-1.5 text-[11px] text-ink-600 hover:bg-ink-50"
-                title="Toggle accelerated companion timing"
+                title={lang === "zh" ? "切换旅伴测试速度" : "Toggle accelerated companion timing"}
               >
                 <span className="text-sm leading-none">!</span>
-                <span className="hidden sm:inline">{state.testMode ? "Fast" : "Normal"}</span>
+                <span className="hidden sm:inline">
+                  {state.testMode ? (lang === "zh" ? "测试快" : "Fast") : lang === "zh" ? "正常" : "Normal"}
+                </span>
               </button>
               <button
                 type="button"
