@@ -7,6 +7,8 @@ import Stats from "@/components/Stats";
 import YearView from "@/components/YearView";
 import TripView from "@/components/TripView";
 import ChatOverlay from "@/components/ChatOverlay";
+import CompanionOnboarding from "@/components/CompanionOnboarding";
+import CompanionStatus from "@/components/CompanionStatus";
 import PriceAlert from "@/components/PriceAlert";
 import MaturitySummary from "@/components/MaturitySummary";
 import type {
@@ -19,6 +21,15 @@ import type {
   WishlistItem,
 } from "@/lib/types";
 import type { WarpStop } from "@/lib/time";
+import {
+  COMPANION_STORAGE_KEY,
+  createDefaultCompanionState,
+  maybeAdvanceCompanionLocation,
+  parseCompanionState,
+  selectCharacter,
+  serializeCompanionState,
+  type CompanionState,
+} from "@/lib/companion";
 
 const PLAN_KEY = "aurora.plan.v1";
 const LANG_KEY = "aurora.lang.v1";
@@ -28,6 +39,8 @@ export default function Home() {
   const [warp, setWarp] = useState<WarpStop>("year-start");
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
   const [plannerOpen, setPlannerOpen] = useState(false);
+  const [companionState, setCompanionState] = useState<CompanionState>(() => createDefaultCompanionState());
+  const [companionChatOpen, setCompanionChatOpen] = useState(false);
   const [plannerSeed, setPlannerSeed] = useState<WishlistItem[]>([]);
   const [profile, setProfile] = useState<PlanProfile | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -51,11 +64,18 @@ export default function Home() {
         window.localStorage.removeItem(PLAN_KEY);
       }
     }
+
+    const savedCompanion = parseCompanionState(window.localStorage.getItem(COMPANION_STORAGE_KEY));
+    setCompanionState(maybeAdvanceCompanionLocation(savedCompanion ?? createDefaultCompanionState()));
   }, []);
 
   useEffect(() => {
     window.localStorage.setItem(LANG_KEY, lang);
   }, [lang]);
+
+  useEffect(() => {
+    window.localStorage.setItem(COMPANION_STORAGE_KEY, serializeCompanionState(companionState));
+  }, [companionState]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -83,6 +103,10 @@ export default function Home() {
     setWarp("year-start");
     setPlannerSeed([]);
     window.localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
+  }
+
+  function chooseCompanion(characterId: string) {
+    setCompanionState((state) => selectCharacter(state, characterId));
   }
 
   function clearPlan() {
@@ -138,6 +162,7 @@ export default function Home() {
           )}
         </section>
 
+        <CompanionStatus lang={lang} state={companionState} onOpen={() => setCompanionChatOpen(true)} />
         <TimeWarp lang={lang} warp={warp} disabled={!hasPlan} onChange={setWarp} />
         <MaturitySummary lang={lang} warp={warp} trips={trips} />
         <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
@@ -170,6 +195,9 @@ export default function Home() {
           <kbd className="px-1.5 py-0.5 rounded border hairline text-[10px]">Cmd/Ctrl + K</kbd>
         </footer>
       </div>
+
+      {companionChatOpen && null}
+      <CompanionOnboarding lang={lang} state={companionState} onSelect={chooseCompanion} />
 
       <ChatOverlay
         open={plannerOpen}
