@@ -1,6 +1,8 @@
 "use client";
 
+import PixelCompanion from "@/components/PixelCompanion";
 import { COMPANION_CHARACTERS } from "@/data/companion";
+import type { CompanionAction } from "@/lib/companion";
 import type { CompanionState } from "@/lib/companion";
 import type { Lang } from "@/lib/types";
 
@@ -14,9 +16,7 @@ function copy(lang: Lang, zh: string, en: string) {
   return lang === "zh" ? zh : en;
 }
 
-function characterInitial(lang: Lang, nameZh: string, nameEn: string) {
-  return copy(lang, nameZh, nameEn).slice(0, 1);
-}
+const PREVIEW_ACTIONS: readonly CompanionAction[] = ["walking", "photo", "excited", "food", "map", "idle", "sleepy", "photo"];
 
 export default function CompanionOnboarding({ lang, state, onSelect }: Props) {
   if (state.onboardingCompleted) return null;
@@ -46,24 +46,19 @@ export default function CompanionOnboarding({ lang, state, onSelect }: Props) {
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 lg:grid-cols-4">
-          {COMPANION_CHARACTERS.map((character) => (
+          {COMPANION_CHARACTERS.map((character, index) => (
             <button
               key={character.id}
               type="button"
               onClick={() => onSelect(character.id)}
               className="group rounded-xl border hairline bg-white p-2.5 text-left transition hover:border-aurora-300 hover:bg-aurora-50/50 sm:p-3"
             >
-              <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-gradient-to-br from-aurora-50 to-ink-100 sm:aspect-square">
-                <span className="absolute inset-0 z-0 grid place-items-center text-[18px] font-semibold text-aurora-800">
-                  {characterInitial(lang, character.nameZh, character.nameEn)}
-                </span>
-                <img
-                  src={character.imageSrc}
-                  alt={copy(lang, character.nameZh, character.nameEn)}
-                  className="relative z-10 h-full w-full object-cover transition group-hover:scale-[1.03]"
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                  }}
+              <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-aurora-50 to-ink-100 sm:aspect-square">
+                <PixelCompanion
+                  character={character}
+                  action={PREVIEW_ACTIONS[index % PREVIEW_ACTIONS.length]}
+                  label={copy(lang, character.nameZh, character.nameEn)}
+                  size="lg"
                 />
               </div>
               <div className="mt-3 text-[15px] font-semibold text-ink-900">

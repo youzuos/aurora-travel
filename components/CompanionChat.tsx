@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import PixelCompanion from "@/components/PixelCompanion";
 import {
   commitCompanionUserMessage,
   getCharacter,
+  getCompanionAction,
+  getCompanionLocalTimeInfo,
   getCurrentLocation,
   type CompanionMessage,
   type CompanionState,
@@ -70,7 +73,8 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
   const location = getCurrentLocation(state);
   const messages = useMemo(() => state.messageHistory.slice(-40), [state.messageHistory]);
-  const characterInitial = (lang === "zh" ? character?.nameZh : character?.nameEn)?.slice(0, 1) ?? "";
+  const action = getCompanionAction(state);
+  const timeInfo = getCompanionLocalTimeInfo(state);
 
   useEffect(() => {
     if (!open || state.unreadCount === 0) return;
@@ -104,17 +108,13 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
         <div className="border-b hairline px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="relative h-10 w-10 overflow-hidden rounded-xl bg-gradient-to-br from-aurora-50 to-ink-100">
-                <span className="absolute inset-0 z-0 grid place-items-center text-[12px] font-semibold text-aurora-800">
-                  {characterInitial}
-                </span>
-                <img
-                  src={character.imageSrc}
-                  alt={lang === "zh" ? character.nameZh : character.nameEn}
-                  className="relative z-10 h-10 w-10 object-cover"
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                  }}
+              <div className="relative h-10 w-10 shrink-0">
+                <PixelCompanion
+                  character={character}
+                  action={action}
+                  label={lang === "zh" ? character.nameZh : character.nameEn}
+                  size="sm"
+                  animated={false}
                 />
               </div>
               <div className="min-w-0">
@@ -122,7 +122,9 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
                   {lang === "zh" ? character.nameZh : character.nameEn}
                 </div>
                 <div className="truncate text-[11px] text-ink-500">
-                  {lang === "zh" ? `正在 ${location.cityZh} 旅行` : `Traveling in ${location.cityEn}`}
+                  {lang === "zh"
+                    ? `正在 ${location.cityZh} 旅行 · 当地 ${timeInfo.hour.toString().padStart(2, "0")}:00`
+                    : `Traveling in ${location.cityEn} · local ${timeInfo.hour.toString().padStart(2, "0")}:00`}
                 </div>
               </div>
             </div>

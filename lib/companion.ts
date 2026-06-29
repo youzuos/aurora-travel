@@ -10,6 +10,7 @@ export { COMPANION_STORAGE_KEY, COMPANION_TIMING };
 
 export type CompanionCharacter = (typeof COMPANION_CHARACTERS)[number];
 export type CompanionLocation = (typeof COMPANION_LOCATIONS)[number];
+export type CompanionAction = "idle" | "walking" | "photo" | "food" | "map" | "sleepy" | "excited";
 export type CompanionMessageKind = "text" | "voice" | "image" | "mixed";
 export type CompanionMessageSender = "user" | "agent";
 
@@ -42,6 +43,7 @@ export interface CompanionState {
   onboardingCompleted: boolean;
   testMode: boolean;
   statusCursor: number;
+  visualAction: CompanionAction;
 }
 
 export interface CompanionMessageOptions {
@@ -59,6 +61,15 @@ type SnippetGroup = {
 };
 
 const DEFAULT_LOCATION_ID = "kyoto";
+const VALID_VISUAL_ACTIONS: readonly CompanionAction[] = [
+  "idle",
+  "walking",
+  "photo",
+  "food",
+  "map",
+  "sleepy",
+  "excited",
+];
 
 const SNIPPET_OVERRIDES: Partial<
   Record<
@@ -381,6 +392,7 @@ export function createDefaultCompanionState(now = Date.now()): CompanionState {
     onboardingCompleted: false,
     testMode: false,
     statusCursor: 0,
+    visualAction: "idle",
   };
 }
 
@@ -411,6 +423,7 @@ export function parseCompanionState(raw: string | null, now = Date.now()): Compa
       onboardingCompleted: Boolean(parsed.onboardingCompleted && selectedCharacterId),
       testMode: Boolean(parsed.testMode),
       statusCursor: typeof parsed.statusCursor === "number" ? parsed.statusCursor : 0,
+      visualAction: isCompanionAction(parsed.visualAction) ? parsed.visualAction : "idle",
     };
   } catch {
     return null;
@@ -452,6 +465,55 @@ function appendMessages(history: readonly CompanionMessage[], messages: readonly
 
 function nextUnreadCount(unreadCount: number, incrementUnread: boolean) {
   return incrementUnread ? Math.min(3, unreadCount + 1) : unreadCount;
+}
+
+function isCompanionAction(value: unknown): value is CompanionAction {
+  return typeof value === "string" && VALID_VISUAL_ACTIONS.includes(value as CompanionAction);
+}
+
+function getLocationHour(location: CompanionLocation, now: number) {
+  try {
+    const hour = new Intl.DateTimeFormat("en-US", {
+      timeZone: location.timeZone,
+      hour: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(now)).find((part) => part.type === "hour")?.value;
+    return hour ? Number(hour) % 24 : new Date(now).getHours();
+  } catch {
+    return new Date(now).getHours();
+  }
+}
+
+export function getCompanionLocalTimeInfo(state: CompanionState, now = Date.now()) {
+  const location = getCurrentLocation(state);
+  const hour = getLocationHour(location, now);
+  const sleeping = hour >= 22 || hour < 7;
+  const meal = hour >= 7 && hour < 11 ? "breakfast" : hour >= 11 && hour < 15 ? "lunch" : hour >= 17 && hour < 21 ? "dinner" : "snack";
+
+  return {
+    hour,
+    sleeping,
+    meal,
+    labelZh: `${location.cityZh} ${hour.toString().padStart(2, "0")}:00`,
+    labelEn: `${location.cityEn} ${hour.toString().padStart(2, "0")}:00`,
+  };
+}
+
+function actionForIntent(intent: Intent, state: CompanionState, now: number): CompanionAction {
+  const timeInfo = getCompanionLocalTimeInfo(state, now);
+  if (timeInfo.sleeping && intent !== "move") return "sleepy";
+  if (intent === "move") return "map";
+  if (intent === "photo") return "photo";
+  if (intent === "food") return timeInfo.sleeping ? "sleepy" : "food";
+  if (intent === "people" || intent === "scenery") return "excited";
+  return "idle";
+}
+
+export function getCompanionAction(state: CompanionState, now = Date.now()): CompanionAction {
+  const { sleeping } = getCompanionLocalTimeInfo(state, now);
+  const inactiveMs = now - state.lastActiveAt;
+  if (inactiveMs > 8 * 60 * 60 * 1000 || sleeping) return "sleepy";
+  return state.visualAction;
 }
 
 function getLocationSnippets(location: CompanionLocation) {
@@ -548,6 +610,7 @@ export function selectCharacter(state: CompanionState, characterId: string, now 
     lastActiveAt: now,
     messageHistory: [arrival],
     unreadCount: 0,
+    visualAction: "excited",
   };
 }
 
@@ -578,6 +641,7 @@ export function maybeAdvanceCompanionLocation(
     statusCursor: state.statusCursor + 1,
     messageHistory: appendMessages(state.messageHistory, [arrival]),
     unreadCount: nextUnreadCount(state.unreadCount, incrementUnread),
+    visualAction: "excited",
   };
 }
 
@@ -682,6 +746,7 @@ export function generateCompanionReply(
           statusCursor: state.statusCursor + 1,
           messageHistory: appendMessages(state.messageHistory, [userMessage, depart, arrival]),
           unreadCount: 0,
+          visualAction: "map",
         },
         messages: [userMessage, depart, arrival],
       };
@@ -698,6 +763,7 @@ export function generateCompanionReply(
         ...state,
         lastActiveAt: now,
         messageHistory: appendMessages(state.messageHistory, [userMessage, fallback]),
+        visualAction: "map",
       },
       messages: [userMessage, fallback],
     };
@@ -712,6 +778,7 @@ export function generateCompanionReply(
       statusCursor: state.statusCursor + 1,
       messageHistory: appendMessages(state.messageHistory, [userMessage, reply]),
       unreadCount: 0,
+      visualAction: actionForIntent(intent, state, now),
     },
     messages: [userMessage, reply],
   };
@@ -743,6 +810,7 @@ export function addPassiveCompanionMessage(
       statusCursor: state.statusCursor + 1,
       messageHistory: appendMessages(state.messageHistory, [message]),
       unreadCount: nextUnreadCount(state.unreadCount, incrementUnread),
+      visualAction: getCompanionLocalTimeInfo(state, now).sleeping ? "sleepy" : "walking",
     },
     message,
   };

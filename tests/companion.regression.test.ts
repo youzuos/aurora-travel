@@ -5,6 +5,8 @@ import {
   createAgentMessage,
   createDefaultCompanionState,
   generateCompanionReply,
+  getCompanionAction,
+  getCompanionLocalTimeInfo,
   maybeAdvanceCompanionLocation,
   mergeGeneratedReplyState,
   selectCharacter,
@@ -91,6 +93,19 @@ runCase("sending a user message commits an agent response immediately", () => {
   assert.equal(newMessages[0]?.sender, "user");
   assert.equal(newMessages.some((message) => message.sender === "agent"), true);
   assert.equal(committed.unreadCount, 0);
+});
+
+runCase("visual action follows the current city local time", () => {
+  const kyotoLunchUtc = Date.UTC(2026, 5, 29, 3, 0, 0);
+  const kyotoNightUtc = Date.UTC(2026, 5, 29, 13, 0, 0);
+
+  const lunchState = generateCompanionReply("what did you eat", readyState({ currentLocationId: "kyoto" }), "en", kyotoLunchUtc).state;
+  const nightState = generateCompanionReply("what did you eat", readyState({ currentLocationId: "kyoto" }), "en", kyotoNightUtc).state;
+
+  assert.equal(getCompanionLocalTimeInfo(lunchState, kyotoLunchUtc).hour, 12);
+  assert.equal(getCompanionAction(lunchState, kyotoLunchUtc), "food");
+  assert.equal(getCompanionLocalTimeInfo(nightState, kyotoNightUtc).hour, 22);
+  assert.equal(getCompanionAction(nightState, kyotoNightUtc), "sleepy");
 });
 
 runCase("rotating snippets vary by cursor for status, food, and photo", () => {
