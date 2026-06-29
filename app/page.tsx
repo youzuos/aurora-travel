@@ -7,6 +7,8 @@ import Stats from "@/components/Stats";
 import YearView from "@/components/YearView";
 import TripView from "@/components/TripView";
 import ChatOverlay from "@/components/ChatOverlay";
+import CompanionBubble from "@/components/CompanionBubble";
+import CompanionChat from "@/components/CompanionChat";
 import CompanionOnboarding from "@/components/CompanionOnboarding";
 import CompanionStatus from "@/components/CompanionStatus";
 import PriceAlert from "@/components/PriceAlert";
@@ -201,8 +203,29 @@ export default function Home() {
         </footer>
       </div>
 
-      {companionChatOpen && null}
       {companionStateReady ? <CompanionOnboarding lang={lang} state={companionState} onSelect={chooseCompanion} /> : null}
+      {companionStateReady ? (
+        <>
+          <CompanionBubble
+            lang={lang}
+            state={companionState}
+            chatOpen={companionChatOpen}
+            onOpen={() => setCompanionChatOpen(true)}
+            onStateChange={setCompanionState}
+          />
+          <CompanionChat
+            open={companionChatOpen}
+            lang={lang}
+            state={companionState}
+            onClose={() => setCompanionChatOpen(false)}
+            onStateChange={setCompanionState}
+            onChangeCharacter={() => {
+              setCompanionChatOpen(false);
+              setCompanionState((state) => ({ ...state, onboardingCompleted: false }));
+            }}
+          />
+        </>
+      ) : null}
 
       <ChatOverlay
         open={plannerOpen}
