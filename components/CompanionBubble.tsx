@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import PixelCompanion from "@/components/PixelCompanion";
+import PixelCompanion from "@/components/PixelSpriteCompanion";
 import {
   COMPANION_TIMING,
   addPassiveCompanionMessage,

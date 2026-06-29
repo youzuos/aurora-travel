@@ -1,6 +1,6 @@
 "use client";
 
-import PixelCompanion from "@/components/PixelCompanion";
+import PixelCompanion from "@/components/PixelSpriteCompanion";
 import { COMPANION_CHARACTERS } from "@/data/companion";
 import type { CompanionAction } from "@/lib/companion";
 import type { CompanionState } from "@/lib/companion";
