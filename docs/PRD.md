@@ -1,6 +1,6 @@
 # Aurora Product Requirements Document
 
-Version: v2.1
+Version: v2.2
 Last updated: 2026-06-29
 Source of truth: this Markdown PRD. The existing `Aurora-PRD-v2.0.docx` is retained as a presentation/reference artifact.
 
@@ -52,6 +52,7 @@ Purpose:
 - Show the user's whole year at a glance.
 - Show planned trips, deferred wishes, PTO usage, budget usage, wish coverage, and trip count.
 - Represent each trip's maturity state consistently.
+- Once a plan exists, Year View should appear before supporting detail modules on the homepage so the annual Gantt-style plan is immediately visible.
 
 Current maturity model:
 - Sketch: broad range, far from departure.
@@ -117,6 +118,7 @@ Design principle:
 - Lower the blank-page cost.
 - Use inspiration as a starting point, not as a finished plan.
 - Do not silently make important assumptions about PTO, budget, trip count, or unavailable dates.
+- Do not show detail modules that require a generated plan, such as Time Warp, maturity summary, agent alerts, or stats, before the user has created a plan.
 
 ## 6. Wishlist Priority
 

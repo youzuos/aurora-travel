@@ -138,22 +138,7 @@ export default function Home() {
           )}
         </section>
 
-        <TimeWarp lang={lang} warp={warp} disabled={!hasPlan} onChange={setWarp} />
-        <MaturitySummary lang={lang} warp={warp} trips={trips} />
-        <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
-        <Stats lang={lang} profile={profile} trips={trips} deferredTrips={deferredTrips} />
-
-        {selectedTrip ? (
-          <TripView
-            lang={lang}
-            destinationId={selectedTrip}
-            warp={warp}
-            trips={trips}
-            profile={profile}
-            onBack={() => setSelectedTrip(null)}
-            onOpenPlanner={() => openPlanner()}
-          />
-        ) : (
+        {!hasPlan && (
           <YearView
             lang={lang}
             warp={warp}
@@ -162,6 +147,36 @@ export default function Home() {
             onSelectTrip={setSelectedTrip}
             onOpenPlanner={() => openPlanner()}
             onStartWithWishlist={openPlanner}
+          />
+        )}
+
+        {hasPlan && !selectedTrip && (
+          <>
+            <YearView
+              lang={lang}
+              warp={warp}
+              trips={trips}
+              deferredTrips={deferredTrips}
+              onSelectTrip={setSelectedTrip}
+              onOpenPlanner={() => openPlanner()}
+              onStartWithWishlist={openPlanner}
+            />
+            <TimeWarp lang={lang} warp={warp} onChange={setWarp} />
+            <MaturitySummary lang={lang} warp={warp} trips={trips} />
+            <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
+            <Stats lang={lang} profile={profile} trips={trips} deferredTrips={deferredTrips} />
+          </>
+        )}
+
+        {hasPlan && selectedTrip && (
+          <TripView
+            lang={lang}
+            destinationId={selectedTrip}
+            warp={warp}
+            trips={trips}
+            profile={profile}
+            onBack={() => setSelectedTrip(null)}
+            onOpenPlanner={() => openPlanner()}
           />
         )}
 

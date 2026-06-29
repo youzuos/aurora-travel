@@ -2,6 +2,20 @@
 
 This file records product design and architecture changes that affect the PRD. Keep entries concise and reversible through Git.
 
+## 2026-06-29 - v2.2 Homepage information hierarchy update
+
+Context:
+- The no-plan homepage showed plan-detail modules such as Time Warp and stats with empty placeholder values, which distracted from first-use onboarding.
+- The annual Gantt-style Year View should be the first detail surface once a plan exists.
+
+Product changes:
+- Hide Time Warp, maturity summary, agent alerts, and stats when the user has not generated or saved a plan.
+- Show only the onboarding/empty-state planning surface before first plan creation.
+- After a plan exists, place the Year View/Gantt surface above supporting detail modules so the annual plan is immediately visible.
+
+Rollback notes:
+- Revert this changelog entry and the matching `docs/PRD.md` v2.2 updates to return to v2.1 homepage hierarchy.
+
 ## 2026-06-29 - v2.1 MVP planning framework update
 
 Context:
