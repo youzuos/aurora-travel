@@ -6,6 +6,7 @@ import {
   addPassiveCompanionMessage,
   getCharacter,
   getCurrentLocation,
+  maybeAdvanceCompanionLocation,
   type CompanionMessage,
   type CompanionState,
 } from "@/lib/companion";
@@ -16,37 +17,66 @@ interface Props {
   state: CompanionState;
   chatOpen: boolean;
   onOpen: () => void;
-  onStateChange: (state: CompanionState) => void;
+  onStateChange: (update: CompanionState | ((state: CompanionState) => CompanionState)) => void;
 }
 
 export default function CompanionBubble({ lang, state, chatOpen, onOpen, onStateChange }: Props) {
   const [bubble, setBubble] = useState<CompanionMessage | null>(null);
   const hideTimerRef = useRef<number | null>(null);
+  const stateRef = useRef(state);
+  const chatOpenRef = useRef(chatOpen);
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
   const location = getCurrentLocation(state);
   const characterInitial = (lang === "zh" ? character?.nameZh : character?.nameEn)?.slice(0, 1) ?? "";
 
+  function clearBubbleTimer() {
+    if (hideTimerRef.current) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }
+
   useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    chatOpenRef.current = chatOpen;
     if (chatOpen) {
       setBubble(null);
-      if (hideTimerRef.current) {
-        window.clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = null;
-      }
-      return;
+      clearBubbleTimer();
     }
+  }, [chatOpen]);
 
+  useEffect(() => {
     if (!state.onboardingCompleted) return;
 
     const intervalMs = state.testMode ? COMPANION_TIMING.testBubbleMs : COMPANION_TIMING.productionBubbleMs;
     const timer = window.setInterval(() => {
-      const result = addPassiveCompanionMessage(state, lang);
-      setBubble(result.message);
+      const now = Date.now();
+      const currentState = stateRef.current;
+      const incrementUnread = !chatOpenRef.current;
+      const advancedState = maybeAdvanceCompanionLocation(currentState, now, { incrementUnread });
+      const moved = advancedState.currentLocationId !== currentState.currentLocationId;
+
+      const result = moved
+        ? {
+            state: advancedState,
+            message: advancedState.messageHistory[advancedState.messageHistory.length - 1] ?? null,
+          }
+        : addPassiveCompanionMessage(advancedState, lang, now, { incrementUnread });
+
+      stateRef.current = result.state;
       onStateChange(result.state);
 
-      if (hideTimerRef.current) {
-        window.clearTimeout(hideTimerRef.current);
+      if (chatOpenRef.current || !result.message) {
+        setBubble(null);
+        clearBubbleTimer();
+        return;
       }
+
+      setBubble(result.message);
+      clearBubbleTimer();
       hideTimerRef.current = window.setTimeout(() => {
         setBubble(null);
         hideTimerRef.current = null;
@@ -55,12 +85,9 @@ export default function CompanionBubble({ lang, state, chatOpen, onOpen, onState
 
     return () => {
       window.clearInterval(timer);
-      if (hideTimerRef.current) {
-        window.clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = null;
-      }
+      clearBubbleTimer();
     };
-  }, [chatOpen, lang, onStateChange, state]);
+  }, [lang, onStateChange, state.onboardingCompleted, state.testMode]);
 
   if (!state.onboardingCompleted || !character) return null;
 

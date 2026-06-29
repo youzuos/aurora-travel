@@ -5,6 +5,8 @@ import {
   generateCompanionReply,
   getCharacter,
   getCurrentLocation,
+  maybeAdvanceCompanionLocation,
+  mergeGeneratedReplyState,
   type CompanionMessage,
   type CompanionState,
 } from "@/lib/companion";
@@ -15,7 +17,7 @@ interface Props {
   lang: Lang;
   state: CompanionState;
   onClose: () => void;
-  onStateChange: (state: CompanionState) => void;
+  onStateChange: (update: CompanionState | ((state: CompanionState) => CompanionState)) => void;
   onChangeCharacter: () => void;
 }
 
@@ -32,19 +34,59 @@ function speak(text: string, lang: Lang) {
   window.speechSynthesis.speak(utterance);
 }
 
+function PhotoCard({ message, lang }: { message: CompanionMessage; lang: Lang }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const caption = lang === "zh" ? message.image?.captionZh : message.image?.captionEn;
+  const fallbackLabel = lang === "zh" ? "城市照片暂时不可用。" : "This city photo is unavailable right now.";
+
+  if (!message.image) return null;
+
+  return (
+    <div className="mb-2 overflow-hidden rounded-xl border hairline bg-ink-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-aurora-50 via-white to-ink-100">
+        {!imageFailed ? (
+          <img
+            src={message.image.src}
+            alt={message.image.alt}
+            className="h-full w-full object-cover"
+            onError={() => setImageFailed(true)}
+          />
+        ) : null}
+        {imageFailed ? (
+          <div className="absolute inset-0 flex items-end p-3 text-[11px] leading-relaxed text-ink-600">
+            {caption ?? fallbackLabel}
+          </div>
+        ) : null}
+      </div>
+      <div className="space-y-1 px-3 py-2 text-[10.5px] text-ink-500">
+        <div>{caption ?? fallbackLabel}</div>
+        <div>{message.image.credit}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function CompanionChat({ open, lang, state, onClose, onStateChange, onChangeCharacter }: Props) {
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const replyTimerRef = useRef<number | null>(null);
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
   const location = getCurrentLocation(state);
   const messages = useMemo(() => state.messageHistory.slice(-40), [state.messageHistory]);
   const characterInitial = (lang === "zh" ? character?.nameZh : character?.nameEn)?.slice(0, 1) ?? "";
 
+  function clearPendingReply() {
+    if (replyTimerRef.current) {
+      window.clearTimeout(replyTimerRef.current);
+      replyTimerRef.current = null;
+    }
+  }
+
   useEffect(() => {
     if (!open || state.unreadCount === 0) return;
-    onStateChange({ ...state, unreadCount: 0 });
-  }, [open, onStateChange, state]);
+    onStateChange((currentState) => ({ ...currentState, unreadCount: 0 }));
+  }, [open, onStateChange, state.unreadCount]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -52,8 +94,15 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
 
   useEffect(() => {
     if (open) return;
+    clearPendingReply();
     setTyping(false);
   }, [open]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingReply();
+    };
+  }, []);
 
   if (!open || !character) return null;
 
@@ -61,18 +110,26 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
     const text = draft.trim();
     if (!text || typing) return;
 
+    clearPendingReply();
     setDraft("");
-    const result = generateCompanionReply(text, state, lang);
-    const userOnlyState = {
+
+    const now = Date.now();
+    const activeState = maybeAdvanceCompanionLocation(state, now, { incrementUnread: false });
+    const result = generateCompanionReply(text, activeState, lang, now);
+    const userOnlyState: CompanionState = {
       ...result.state,
-      messageHistory: [...state.messageHistory, result.messages[0]].slice(-60),
+      messageHistory: activeState.messageHistory.concat(result.messages[0]).slice(-60),
+      unreadCount: 0,
     };
 
     onStateChange(userOnlyState);
     setTyping(true);
-    window.setTimeout(() => {
+    replyTimerRef.current = window.setTimeout(() => {
+      replyTimerRef.current = null;
       setTyping(false);
-      onStateChange(result.state);
+      onStateChange((latestState) =>
+        mergeGeneratedReplyState(latestState, userOnlyState, result.state, result.messages.slice(1))
+      );
     }, 520);
   }
 
@@ -113,7 +170,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => onStateChange({ ...state, testMode: !state.testMode })}
+                onClick={() => onStateChange((currentState) => ({ ...currentState, testMode: !currentState.testMode }))}
                 className="inline-flex items-center gap-1 rounded-full border hairline px-3 py-1.5 text-[11px] text-ink-600 hover:bg-ink-50"
                 title={lang === "zh" ? "切换旅伴测试速度" : "Toggle accelerated companion timing"}
               >
@@ -124,12 +181,24 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
               </button>
               <button
                 type="button"
-                onClick={onChangeCharacter}
+                onClick={() => {
+                  clearPendingReply();
+                  setTyping(false);
+                  onChangeCharacter();
+                }}
                 className="rounded-full border hairline px-3 py-1.5 text-[11px] text-ink-600 hover:bg-ink-50"
               >
                 {lang === "zh" ? "换角色" : "Change"}
               </button>
-              <button type="button" onClick={onClose} className="text-xl leading-none text-ink-400 hover:text-ink-900">
+              <button
+                type="button"
+                onClick={() => {
+                  clearPendingReply();
+                  setTyping(false);
+                  onClose();
+                }}
+                className="text-xl leading-none text-ink-400 hover:text-ink-900"
+              >
                 x
               </button>
             </div>
@@ -144,12 +213,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
                   message.sender === "user" ? "bg-ink-900 text-white" : "border hairline bg-white text-ink-800"
                 }`}
               >
-                {message.image ? (
-                  <div className="mb-2 overflow-hidden rounded-xl bg-ink-100">
-                    <img src={message.image.src} alt={message.image.alt} className="aspect-[4/3] w-full object-cover" />
-                    <div className="px-3 py-2 text-[10.5px] text-ink-500">{message.image.credit}</div>
-                  </div>
-                ) : null}
+                {message.image ? <PhotoCard message={message} lang={lang} /> : null}
 
                 {message.kind === "voice" ? (
                   <button
@@ -169,7 +233,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
 
           {typing ? (
             <div className="text-[12px] text-ink-400">
-              {lang === "zh" ? "小旅伴正在打字..." : "Companion is typing..."}
+              {lang === "zh" ? "旅伴正在打字..." : "Companion is typing..."}
             </div>
           ) : null}
         </div>

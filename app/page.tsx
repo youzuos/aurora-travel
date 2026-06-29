@@ -83,6 +83,32 @@ export default function Home() {
   }, [companionState, companionStateReady]);
 
   useEffect(() => {
+    if (!companionStateReady) return;
+
+    function refreshCompanionPresence() {
+      setCompanionState((currentState) =>
+        maybeAdvanceCompanionLocation(currentState, Date.now(), { incrementUnread: !companionChatOpen })
+      );
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        refreshCompanionPresence();
+      }
+    }
+
+    window.addEventListener("focus", refreshCompanionPresence);
+    window.addEventListener("pageshow", refreshCompanionPresence);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", refreshCompanionPresence);
+      window.removeEventListener("pageshow", refreshCompanionPresence);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [companionChatOpen, companionStateReady]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -114,6 +140,13 @@ export default function Home() {
     setCompanionState((state) => selectCharacter(state, characterId));
   }
 
+  function openCompanionChat() {
+    setCompanionState((currentState) =>
+      maybeAdvanceCompanionLocation(currentState, Date.now(), { incrementUnread: false })
+    );
+    setCompanionChatOpen(true);
+  }
+
   function clearPlan() {
     setProfile(null);
     setTrips([]);
@@ -130,7 +163,7 @@ export default function Home() {
         lang={lang}
         onOpenPlanner={() => openPlanner()}
         onToggleLanguage={() => setLang((value) => (value === "zh" ? "en" : "zh"))}
-        onOpenCompanion={() => setCompanionChatOpen(true)}
+        onOpenCompanion={openCompanionChat}
       />
 
       <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-8 space-y-6">
@@ -168,9 +201,7 @@ export default function Home() {
           )}
         </section>
 
-        {companionStateReady ? (
-          <CompanionStatus lang={lang} state={companionState} onOpen={() => setCompanionChatOpen(true)} />
-        ) : null}
+        {companionStateReady ? <CompanionStatus lang={lang} state={companionState} onOpen={openCompanionChat} /> : null}
         <TimeWarp lang={lang} warp={warp} disabled={!hasPlan} onChange={setWarp} />
         <MaturitySummary lang={lang} warp={warp} trips={trips} />
         <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
@@ -211,7 +242,7 @@ export default function Home() {
             lang={lang}
             state={companionState}
             chatOpen={companionChatOpen}
-            onOpen={() => setCompanionChatOpen(true)}
+            onOpen={openCompanionChat}
             onStateChange={setCompanionState}
           />
           <CompanionChat
