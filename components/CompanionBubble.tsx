@@ -26,7 +26,16 @@ export default function CompanionBubble({ lang, state, chatOpen, onOpen, onState
   const location = getCurrentLocation(state);
 
   useEffect(() => {
-    if (!state.onboardingCompleted || chatOpen) return;
+    if (chatOpen) {
+      setBubble(null);
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (!state.onboardingCompleted) return;
 
     const intervalMs = state.testMode ? COMPANION_TIMING.testBubbleMs : COMPANION_TIMING.productionBubbleMs;
     const timer = window.setInterval(() => {
@@ -56,7 +65,7 @@ export default function CompanionBubble({ lang, state, chatOpen, onOpen, onState
 
   return (
     <div className="fixed bottom-5 right-5 z-40 flex max-w-[calc(100vw-2.5rem)] flex-col items-end gap-2">
-      {bubble ? (
+      {!chatOpen && bubble ? (
         <button
           type="button"
           onClick={onOpen}
