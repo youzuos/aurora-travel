@@ -16,6 +16,7 @@ next-env.d.ts
 .claude/
 .playwright-mcp/
 .worktrees/
+.superpowers/
 
 # demo verification artifacts
 demo-*.png
