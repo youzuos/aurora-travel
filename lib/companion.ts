@@ -149,3 +149,204 @@ export function serializeCompanionState(state: CompanionState): string {
 export function textFor(lang: Lang, zh: string, en: string) {
   return lang === "zh" ? zh : en;
 }
+
+
+type Intent = "status" | "food" | "photo" | "people" | "scenery" | "move" | "unknown";
+
+function normalizeInput(input: string) {
+  return input.trim().toLowerCase();
+}
+
+function pickByCursor<T>(items: readonly T[], cursor: number): T {
+  return items[Math.abs(cursor) % items.length];
+}
+
+function detectIntent(input: string): Intent {
+  const value = normalizeInput(input);
+  if (/(go to|visit|travel|move|去|去往|带我去|送我去|前往)/i.test(value)) return "move";
+  if (/(food|eat|drink|restaurant|餐|吃|喝|午餐|晚餐|小吃|美食)/i.test(value)) return "food";
+  if (/(photo|picture|image|show me|拍|照片|图片|相片|拍照|景点)/i.test(value)) return "photo";
+  if (/(people|meet|met|person|认识|遇见|遇到|朋友)/i.test(value)) return "people";
+  if (/(scenery|view|see|景色|风景|景点|风光|夜景)/i.test(value)) return "scenery";
+  if (/(where|what are you doing|status|现在|当前|在哪|还好吗|在做什么|更新)/i.test(value) || value.length <= 8)
+    return "status";
+  return "unknown";
+}
+
+function findLocationFromInput(input: string): CompanionLocation | null {
+  const value = normalizeInput(input);
+  return (
+    COMPANION_LOCATIONS.find((location) =>
+      location.keywords.some((keyword) => value.includes(keyword.toLowerCase()))
+    ) ??
+    COMPANION_LOCATIONS.find(
+      (location) =>
+        value.includes(location.cityEn.toLowerCase()) ||
+        value.includes(location.countryEn.toLowerCase()) ||
+        value.includes(location.cityZh) ||
+        value.includes(location.countryZh)
+    ) ??
+    null
+  );
+}
+
+function chooseNextLocation(state: CompanionState): CompanionLocation {
+  const current = getCurrentLocation(state);
+  const neighbor = current.neighbors[0];
+  return neighbor ? getLocation(neighbor) : COMPANION_LOCATIONS[0];
+}
+
+export function selectCharacter(state: CompanionState, characterId: string, now = Date.now()): CompanionState {
+  const character = getCharacter(characterId);
+  const location = getCurrentLocation(state);
+  const arrival = createAgentMessage(
+    "text",
+    `${character.nameZh} 已到达。${location.snippetsZh.arrival[0]}`,
+    `${character.nameEn} has arrived. ${location.snippetsEn.arrival[0]}`,
+    now
+  );
+  return {
+    ...state,
+    selectedCharacterId: character.id,
+    onboardingCompleted: true,
+    lastActiveAt: now,
+    messageHistory: [arrival],
+    unreadCount: 0,
+  };
+}
+
+export function getStatusLine(state: CompanionState, lang: Lang): string {
+  const location = getCurrentLocation(state);
+  const snippets = lang === "zh" ? location.snippetsZh.status : location.snippetsEn.status;
+  return pickByCursor(snippets, state.statusCursor);
+}
+
+export function maybeAdvanceCompanionLocation(state: CompanionState, now = Date.now()): CompanionState {
+  const stayMs = state.testMode ? COMPANION_TIMING.testStayMs : COMPANION_TIMING.productionStayMs;
+  if (now - state.lastMovedAt < stayMs) return { ...state, lastActiveAt: now };
+  const next = chooseNextLocation(state);
+  const arrival = createAgentMessage("text", next.snippetsZh.arrival[0], next.snippetsEn.arrival[0], now);
+  return {
+    ...state,
+    currentLocationId: next.id,
+    lastMovedAt: now,
+    lastActiveAt: now,
+    statusCursor: state.statusCursor + 1,
+    messageHistory: [...state.messageHistory, arrival].slice(-60),
+    unreadCount: Math.min(3, state.unreadCount + 1),
+  };
+}
+
+function messageForIntent(
+  intent: Exclude<Intent, "move">,
+  location: CompanionLocation,
+  now: number,
+  cursor: number
+) {
+  const zh = location.snippetsZh;
+  const en = location.snippetsEn;
+  if (intent === "photo") {
+    const photo = pickByCursor(location.photos as ReadonlyArray<{ src: string; alt: string; credit: string }>, cursor);
+    return createAgentMessage("image", zh.photo[0], en.photo[0], now, {
+      image: {
+        src: photo.src,
+        alt: photo.alt,
+        credit: photo.credit,
+        captionZh: zh.photo[0],
+        captionEn: en.photo[0],
+      },
+    });
+  }
+  if (intent === "food") return createAgentMessage("mixed", zh.food[0], en.food[0], now);
+  if (intent === "people") return createAgentMessage("text", zh.people[0], en.people[0], now);
+  if (intent === "scenery") return createAgentMessage("voice", zh.scenery[0], en.scenery[0], now, { voiceDurationSec: 8 });
+  if (intent === "status") return createAgentMessage("text", zh.status[0], en.status[0], now);
+  return createAgentMessage(
+    "text",
+    `${zh.status[0]} 还想听我讲些吃的、见到的人，还是给你来张照片吗？`,
+    `${en.status[0]} I can share food notes, people I met, or a photo if you want.`,
+    now
+  );
+}
+
+export function generateCompanionReply(
+  input: string,
+  state: CompanionState,
+  lang: Lang,
+  now = Date.now()
+): { state: CompanionState; messages: CompanionMessage[] } {
+  const userMessage = createUserMessage(input, now);
+  const intent = detectIntent(input);
+  if (intent === "move") {
+    const target = findLocationFromInput(input);
+    if (target) {
+      const depart = createAgentMessage(
+        "text",
+        `我明白了，我会先收好相机，马上前往${target.cityZh}。`,
+        `Got it. I am heading to ${target.cityEn} right away.`,
+        now + 250
+      );
+      const arrival = createAgentMessage("text", target.snippetsZh.arrival[0], target.snippetsEn.arrival[0], now + 900);
+      return {
+        state: {
+          ...state,
+          currentLocationId: target.id,
+          lastMovedAt: now,
+          lastActiveAt: now,
+          statusCursor: state.statusCursor + 1,
+          messageHistory: [...state.messageHistory, userMessage, depart, arrival].slice(-60),
+          unreadCount: 0,
+        },
+        messages: [userMessage, depart, arrival],
+      };
+    }
+    const fallback = createAgentMessage(
+      "text",
+      "先告诉我具体城市或国家名，我会马上出发。",
+      "Tell me a city or country name and I can head there right away.",
+      now + 300
+    );
+    return {
+      state: {
+        ...state,
+        lastActiveAt: now,
+        messageHistory: [...state.messageHistory, userMessage, fallback].slice(-60),
+      },
+      messages: [userMessage, fallback],
+    };
+  }
+
+  const location = getCurrentLocation(state);
+  const reply = messageForIntent(intent, location, now + 450, state.statusCursor);
+  return {
+    state: {
+      ...state,
+      lastActiveAt: now,
+      statusCursor: state.statusCursor + 1,
+      messageHistory: [...state.messageHistory, userMessage, reply].slice(-60),
+      unreadCount: 0,
+    },
+    messages: [userMessage, reply],
+  };
+}
+
+export function addPassiveCompanionMessage(
+  state: CompanionState,
+  lang: Lang,
+  now = Date.now()
+): { state: CompanionState; message: CompanionMessage } {
+  const location = getCurrentLocation(state);
+  const message = messageForIntent("status", location, now, state.statusCursor);
+  return {
+    state: {
+      ...state,
+      lastActiveAt: now,
+      statusCursor: state.statusCursor + 1,
+      messageHistory: [...state.messageHistory, message].slice(-60),
+      unreadCount: Math.min(3, state.unreadCount + 1),
+    },
+    message,
+  };
+}
+
+
