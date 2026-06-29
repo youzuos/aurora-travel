@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  generateCompanionReply,
+  commitCompanionUserMessage,
   getCharacter,
   getCurrentLocation,
-  maybeAdvanceCompanionLocation,
-  mergeGeneratedReplyState,
   type CompanionMessage,
   type CompanionState,
 } from "@/lib/companion";
@@ -68,20 +66,11 @@ function PhotoCard({ message, lang }: { message: CompanionMessage; lang: Lang })
 
 export default function CompanionChat({ open, lang, state, onClose, onStateChange, onChangeCharacter }: Props) {
   const [draft, setDraft] = useState("");
-  const [typing, setTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const replyTimerRef = useRef<number | null>(null);
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
   const location = getCurrentLocation(state);
   const messages = useMemo(() => state.messageHistory.slice(-40), [state.messageHistory]);
   const characterInitial = (lang === "zh" ? character?.nameZh : character?.nameEn)?.slice(0, 1) ?? "";
-
-  function clearPendingReply() {
-    if (replyTimerRef.current) {
-      window.clearTimeout(replyTimerRef.current);
-      replyTimerRef.current = null;
-    }
-  }
 
   useEffect(() => {
     if (!open || state.unreadCount === 0) return;
@@ -90,47 +79,17 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length, typing]);
-
-  useEffect(() => {
-    if (open) return;
-    clearPendingReply();
-    setTyping(false);
-  }, [open]);
-
-  useEffect(() => {
-    return () => {
-      clearPendingReply();
-    };
-  }, []);
+  }, [messages.length]);
 
   if (!open || !character) return null;
 
   function send() {
     const text = draft.trim();
-    if (!text || typing) return;
+    if (!text) return;
 
-    clearPendingReply();
     setDraft("");
-
     const now = Date.now();
-    const activeState = maybeAdvanceCompanionLocation(state, now, { incrementUnread: false });
-    const result = generateCompanionReply(text, activeState, lang, now);
-    const userOnlyState: CompanionState = {
-      ...result.state,
-      messageHistory: activeState.messageHistory.concat(result.messages[0]).slice(-60),
-      unreadCount: 0,
-    };
-
-    onStateChange(userOnlyState);
-    setTyping(true);
-    replyTimerRef.current = window.setTimeout(() => {
-      replyTimerRef.current = null;
-      setTyping(false);
-      onStateChange((latestState) =>
-        mergeGeneratedReplyState(latestState, userOnlyState, result.state, result.messages.slice(1))
-      );
-    }, 520);
+    onStateChange((currentState) => commitCompanionUserMessage(text, currentState, lang, now));
   }
 
   return (
@@ -182,8 +141,6 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
               <button
                 type="button"
                 onClick={() => {
-                  clearPendingReply();
-                  setTyping(false);
                   onChangeCharacter();
                 }}
                 className="rounded-full border hairline px-3 py-1.5 text-[11px] text-ink-600 hover:bg-ink-50"
@@ -193,8 +150,6 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
               <button
                 type="button"
                 onClick={() => {
-                  clearPendingReply();
-                  setTyping(false);
                   onClose();
                 }}
                 className="text-xl leading-none text-ink-400 hover:text-ink-900"
@@ -231,11 +186,6 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
             </div>
           ))}
 
-          {typing ? (
-            <div className="text-[12px] text-ink-400">
-              {lang === "zh" ? "旅伴正在打字..." : "Companion is typing..."}
-            </div>
-          ) : null}
         </div>
 
         <div className="border-t hairline bg-white p-3">
@@ -252,7 +202,7 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
             <button
               type="button"
               onClick={send}
-              disabled={!draft.trim() || typing}
+              disabled={!draft.trim()}
               className="rounded-xl bg-ink-900 px-4 py-2 text-[12px] font-medium text-white disabled:opacity-40"
             >
               {lang === "zh" ? "发送" : "Send"}

@@ -22,8 +22,8 @@ export default function CompanionOnboarding({ lang, state, onSelect }: Props) {
   if (state.onboardingCompleted) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-white/92 px-4 backdrop-blur-md">
-      <div className="w-full max-w-5xl rounded-2xl border hairline bg-white p-5 shadow-2xl sm:p-7">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-white/92 px-4 py-4 backdrop-blur-md sm:items-center sm:py-6">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-5xl overflow-y-auto rounded-2xl border hairline bg-white p-4 shadow-2xl sm:max-h-[calc(100vh-3rem)] sm:p-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-aurora-700">
@@ -45,15 +45,15 @@ export default function CompanionOnboarding({ lang, state, onSelect }: Props) {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 lg:grid-cols-4">
           {COMPANION_CHARACTERS.map((character) => (
             <button
               key={character.id}
               type="button"
               onClick={() => onSelect(character.id)}
-              className="group rounded-xl border hairline bg-white p-3 text-left transition hover:border-aurora-300 hover:bg-aurora-50/50"
+              className="group rounded-xl border hairline bg-white p-2.5 text-left transition hover:border-aurora-300 hover:bg-aurora-50/50 sm:p-3"
             >
-              <div className="relative aspect-square overflow-hidden rounded-lg bg-gradient-to-br from-aurora-50 to-ink-100">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-gradient-to-br from-aurora-50 to-ink-100 sm:aspect-square">
                 <span className="absolute inset-0 z-0 grid place-items-center text-[18px] font-semibold text-aurora-800">
                   {characterInitial(lang, character.nameZh, character.nameEn)}
                 </span>
@@ -69,7 +69,7 @@ export default function CompanionOnboarding({ lang, state, onSelect }: Props) {
               <div className="mt-3 text-[15px] font-semibold text-ink-900">
                 {copy(lang, character.nameZh, character.nameEn)}
               </div>
-              <div className="mt-1 min-h-[38px] text-[12px] leading-relaxed text-ink-600">
+              <div className="mt-1 text-[12px] leading-relaxed text-ink-600 sm:min-h-[38px]">
                 {copy(lang, character.personalityZh, character.personalityEn)}
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -83,7 +83,7 @@ export default function CompanionOnboarding({ lang, state, onSelect }: Props) {
           ))}
         </div>
 
-        <div className="mt-5 rounded-xl border border-dashed border-ink-200 bg-ink-50/60 p-4">
+        <div className="mt-4 rounded-xl border border-dashed border-ink-200 bg-ink-50/60 p-3 sm:mt-5 sm:p-4">
           <div className="text-[13px] font-semibold text-ink-800">
             {copy(lang, "进阶：上传图片生成专属旅伴", "Advanced: upload an image to inspire a custom companion")}
           </div>

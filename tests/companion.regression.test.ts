@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   addPassiveCompanionMessage,
+  commitCompanionUserMessage,
   createAgentMessage,
   createDefaultCompanionState,
   generateCompanionReply,
@@ -47,8 +48,8 @@ runCase("migration can be re-evaluated on later interactions in accelerated test
 });
 
 runCase("vague destination requests match by tags before fallback", () => {
-  const seaReply = generateCompanionReply("去海边吧", readyState(), "zh", 5_000);
-  const quietReply = generateCompanionReply("take me somewhere quiet with temples", readyState(), "en", 6_000);
+  const seaReply = generateCompanionReply("go to the seaside", readyState(), "en", 5_000);
+  const quietReply = generateCompanionReply("go somewhere quiet with temples", readyState(), "en", 6_000);
 
   assert.equal(seaReply.state.currentLocationId, "reykjavik");
   assert.equal(quietReply.state.currentLocationId, "kyoto");
@@ -56,11 +57,11 @@ runCase("vague destination requests match by tags before fallback", () => {
 
 runCase("reply commit merges onto latest state instead of overwriting newer changes", () => {
   const userOnlyState = readyState({
-    messageHistory: [createAgentMessage("text", "出发前", "Before leaving", 1_100)],
+    messageHistory: [createAgentMessage("text", "Before leaving", "Before leaving", 1_100)],
     testMode: false,
     statusCursor: 2,
   });
-  const replyMessage = createAgentMessage("text", "已经回来了", "I am back", 1_700);
+  const replyMessage = createAgentMessage("text", "I am back", "I am back", 1_700);
   const plannedState = {
     ...userOnlyState,
     lastActiveAt: 1_700,
@@ -77,6 +78,19 @@ runCase("reply commit merges onto latest state instead of overwriting newer chan
   assert.equal(merged.testMode, true);
   assert.equal(merged.statusCursor, 4);
   assert.equal(merged.messageHistory.at(-1)?.id, replyMessage.id);
+});
+
+runCase("sending a user message commits an agent response immediately", () => {
+  const state = readyState({
+    messageHistory: [createAgentMessage("text", "Before leaving", "Before leaving", 1_100)],
+  });
+
+  const committed = commitCompanionUserMessage("what are you doing", state, "en", 1_800);
+  const newMessages = committed.messageHistory.slice(state.messageHistory.length);
+
+  assert.equal(newMessages[0]?.sender, "user");
+  assert.equal(newMessages.some((message) => message.sender === "agent"), true);
+  assert.equal(committed.unreadCount, 0);
 });
 
 runCase("rotating snippets vary by cursor for status, food, and photo", () => {

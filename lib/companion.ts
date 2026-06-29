@@ -3,8 +3,8 @@ import {
   COMPANION_LOCATIONS,
   COMPANION_STORAGE_KEY,
   COMPANION_TIMING,
-} from "@/data/companion";
-import type { Lang } from "@/lib/types";
+} from "../data/companion";
+import type { Lang } from "./types";
 
 export { COMPANION_STORAGE_KEY, COMPANION_TIMING };
 
@@ -715,6 +715,16 @@ export function generateCompanionReply(
     },
     messages: [userMessage, reply],
   };
+}
+
+export function commitCompanionUserMessage(
+  input: string,
+  state: CompanionState,
+  lang: Lang,
+  now = Date.now()
+): CompanionState {
+  const activeState = maybeAdvanceCompanionLocation(state, now, { incrementUnread: false });
+  return generateCompanionReply(input, activeState, lang, now).state;
 }
 
 export function addPassiveCompanionMessage(

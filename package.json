@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test:companion": "tsc -p tests/tsconfig.companion-tests.json && node .tmp-companion-tests/tests/companion.regression.test.js",
     "start": "next start",
     "lint": "next lint"
   },
