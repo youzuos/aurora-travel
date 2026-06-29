@@ -17,6 +17,7 @@ next-env.d.ts
 .playwright-mcp/
 .worktrees/
 .superpowers/
+.tmp-companion-tests/
 
 # demo verification artifacts
 demo-*.png
