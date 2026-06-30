@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import CompanionInspirationRadar from "@/components/CompanionInspirationRadar";
 import PixelCompanion from "@/components/PixelSpriteCompanion";
 import {
   commitCompanionUserMessage,
@@ -12,14 +13,17 @@ import {
   type CompanionMessage,
   type CompanionState,
 } from "@/lib/companion";
-import type { Lang } from "@/lib/types";
+import type { WarpStop } from "@/lib/time";
+import type { Lang, WishlistItem } from "@/lib/types";
 
 interface Props {
   open: boolean;
   lang: Lang;
   state: CompanionState;
+  warp: WarpStop;
   onClose: () => void;
   onStateChange: (update: CompanionState | ((state: CompanionState) => CompanionState)) => void;
+  onAddWishlistItems: (items: WishlistItem[]) => void;
   onChangeCharacter: () => void;
 }
 
@@ -68,7 +72,16 @@ function PhotoCard({ message, lang }: { message: CompanionMessage; lang: Lang })
   );
 }
 
-export default function CompanionChat({ open, lang, state, onClose, onStateChange, onChangeCharacter }: Props) {
+export default function CompanionChat({
+  open,
+  lang,
+  state,
+  warp,
+  onClose,
+  onStateChange,
+  onAddWishlistItems,
+  onChangeCharacter,
+}: Props) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -191,6 +204,15 @@ export default function CompanionChat({ open, lang, state, onClose, onStateChang
         </div>
 
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-ink-50/50 px-4 py-4">
+          <CompanionInspirationRadar
+            lang={lang}
+            state={state}
+            warp={warp}
+            compact
+            onStateChange={onStateChange}
+            onAddWishlistItems={onAddWishlistItems}
+          />
+
           {messages.map((message) => (
             <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
               <div

@@ -13,6 +13,12 @@ import {
   type CompanionState,
 } from "../lib/companion";
 import { POST as companionReplyPost } from "../app/api/companion/reply/route";
+import { GET as companionIpHintGet } from "../app/api/companion/ip-hint/route";
+import {
+  companionFindingToWishlistItem,
+  getIpLocationHintFromHeaders,
+  resolveCompanionExploration,
+} from "../lib/companionExploration";
 
 function readyState(overrides: Partial<CompanionState> = {}, now = 1_000): CompanionState {
   return {
@@ -231,6 +237,63 @@ await runCase("reply API uses Gemini when configured and keeps the local media p
     if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = originalOpenAiKey;
   }
+});
+
+await runCase("exploration resolves direct city, country, tag, random, nearby, and wishlist conversion", () => {
+  const kyotoState = readyState({ currentLocationId: "kyoto", statusCursor: 0 }, 1_000);
+  const paris = resolveCompanionExploration("Paris", kyotoState, { now: 2_000, warp: "year-start" });
+  const japan = resolveCompanionExploration("Japan", readyState({ currentLocationId: "reykjavik" }, 1_000), {
+    now: 2_100,
+    warp: "t-90",
+  });
+  const seaside = resolveCompanionExploration("somewhere by the seaside", kyotoState, { now: 2_200, warp: "t-30" });
+  const ipHinted = resolveCompanionExploration("", kyotoState, {
+    now: 2_300,
+    warp: "year-start",
+    ipHint: { countryCode: "FR", city: "Paris" },
+  });
+  const nearby = resolveCompanionExploration("", kyotoState, { now: 2_400, warp: "t-14", mode: "nearby" });
+  const wishlistItem = companionFindingToWishlistItem(paris);
+
+  assert.equal(paris.cityId, "paris");
+  assert.equal(paris.source, "direct-input");
+  assert.equal(japan.source, "country-match");
+  assert.equal(japan.countryEn, "Japan");
+  assert.equal(seaside.source, "tag-match");
+  assert.equal(seaside.tags.includes("seaside"), true);
+  assert.equal(ipHinted.cityId, "paris");
+  assert.equal(ipHinted.source, "ip-hint");
+  assert.notEqual(nearby.cityId, "kyoto");
+  assert.equal(nearby.source, "nearby");
+  assert.equal(typeof nearby.distanceKm, "number");
+  assert.equal((nearby.distanceKm ?? 9999) < 60, true);
+  assert.equal(wishlistItem.label, "Paris");
+  assert.equal(wishlistItem.source, "companion");
+  assert.notEqual(paris.textEn, resolveCompanionExploration("Paris", kyotoState, { now: 2_500, warp: "t-14" }).textEn);
+});
+
+await runCase("IP hint reads common deployment headers without requiring them", async () => {
+  const vercelHeaders = new Headers({
+    "x-vercel-ip-country": "JP",
+    "x-vercel-ip-city": "Tokyo",
+  });
+  const cloudflareHeaders = new Headers({
+    "cf-ipcountry": "FR",
+  });
+
+  assert.deepEqual(getIpLocationHintFromHeaders(vercelHeaders), { countryCode: "JP", city: "Tokyo" });
+  assert.deepEqual(getIpLocationHintFromHeaders(cloudflareHeaders), { countryCode: "FR" });
+  assert.equal(getIpLocationHintFromHeaders(new Headers()), null);
+
+  const response = await companionIpHintGet(
+    new Request("http://localhost/api/companion/ip-hint", {
+      headers: vercelHeaders,
+    })
+  );
+  const body = await response.json();
+
+  assert.equal(body.hint.countryCode, "JP");
+  assert.equal(body.hint.city, "Tokyo");
 });
 }
 

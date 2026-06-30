@@ -9,7 +9,7 @@ export interface WishlistItem {
   label: string;
   priorityLabel: WishlistPriorityLabel;
   priorityScore: 1 | 2 | 3;
-  source: "user" | "inspiration" | "legacy";
+  source: "user" | "inspiration" | "legacy" | "companion";
 }
 
 export interface PeakProbabilityPoint {

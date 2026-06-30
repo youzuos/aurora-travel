@@ -9,6 +9,7 @@ import TripView from "@/components/TripView";
 import ChatOverlay from "@/components/ChatOverlay";
 import CompanionBubble from "@/components/CompanionBubble";
 import CompanionChat from "@/components/CompanionChat";
+import CompanionInspirationRadar from "@/components/CompanionInspirationRadar";
 import CompanionOnboarding from "@/components/CompanionOnboarding";
 import CompanionStatus from "@/components/CompanionStatus";
 import PriceAlert from "@/components/PriceAlert";
@@ -125,6 +126,11 @@ export default function Home() {
     setPlannerOpen(true);
   }
 
+  function openPlannerFromCompanion(seed: WishlistItem[]) {
+    setCompanionChatOpen(false);
+    openPlanner(seed);
+  }
+
   function applyPlan(plan: GeneratedPlan) {
     setProfile(plan.profile);
     setTrips(plan.trips);
@@ -203,6 +209,16 @@ export default function Home() {
 
         {companionStateReady ? <CompanionStatus lang={lang} state={companionState} onOpen={openCompanionChat} /> : null}
 
+        {companionStateReady && !selectedTrip ? (
+          <CompanionInspirationRadar
+            lang={lang}
+            state={companionState}
+            warp={warp}
+            onStateChange={setCompanionState}
+            onAddWishlistItems={openPlanner}
+          />
+        ) : null}
+
         {!hasPlan && (
           <YearView
             lang={lang}
@@ -267,6 +283,8 @@ export default function Home() {
             state={companionState}
             onClose={() => setCompanionChatOpen(false)}
             onStateChange={setCompanionState}
+            warp={warp}
+            onAddWishlistItems={openPlannerFromCompanion}
             onChangeCharacter={() => {
               setCompanionChatOpen(false);
               setCompanionState((state) => ({ ...state, onboardingCompleted: false }));
