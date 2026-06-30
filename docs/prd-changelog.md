@@ -2,6 +2,22 @@
 
 This file records product design and architecture changes that affect the PRD. Keep entries concise and reversible through Git.
 
+## 2026-06-30 - v3.0 PRD and flow documentation
+
+Context:
+- The team added `Aurora-PRD-v3.0.docx` as the latest product direction.
+- The v3.0 PRD introduced a 4-stage product flow: inspiration discovery, initial planning, trip refinement, and near-departure reminders.
+- The user clarified the first-use decision point, 5 exploration attempts, random destination fallback, and day-level trip guidance behavior.
+
+Product changes:
+- Added root-level `Aurora-PRD-v3.0.docx` as the source PRD file for v3.0.
+- Added `docs/v3-user-flow.md` as the editable text source for the current v3.0 user path.
+- Added `docs/v3-frontend-page-logic.md` as the editable text draft for page-level frontend presentation logic.
+- No application code changes are included in this documentation update.
+
+Rollback notes:
+- Revert this changelog entry and remove `Aurora-PRD-v3.0.docx`, `docs/v3-user-flow.md`, and `docs/v3-frontend-page-logic.md` to return to the previous documentation state.
+
 ## 2026-06-29 - v2.2 Homepage information hierarchy update
 
 Context:
