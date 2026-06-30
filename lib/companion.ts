@@ -251,7 +251,7 @@ const SNIPPET_OVERRIDES: Partial<
   paris: {
     zh: {
       status: [
-        "我边整理塞纳河边的照片边躲鸽子，它们总觉得我的背包里藏了面包。",
+        "我边整理塞纳河边的照片边闻到刚出炉的面包香，差点忘了继续赶路。",
         "我刚换到靠窗的位置，玻璃上映着一点金色的傍晚。",
         "桥上的风有点凉，我只好把围巾又绕了一圈。",
       ],
@@ -278,7 +278,7 @@ const SNIPPET_OVERRIDES: Partial<
     },
     en: {
       status: [
-        "I am sorting photos by the Seine while the pigeons keep assuming my backpack hides bread.",
+        "I am sorting photos by the Seine while fresh bread smells keep trying to slow me down.",
         "I just moved to a window table, and the glass is catching a little gold from the evening.",
         "The wind on the bridge turned cool, so I wrapped my scarf one more time.",
       ],

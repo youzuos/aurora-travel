@@ -14,6 +14,7 @@
   },
   "include": [
     "./companion.regression.test.ts",
+    "../app/api/companion/reply/route.ts",
     "../lib/companion.ts",
     "../data/companion.ts",
     "../lib/types.ts"

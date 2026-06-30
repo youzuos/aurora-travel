@@ -7,8 +7,8 @@ import {
   getCurrentLocation,
   type CompanionMessage,
   type CompanionState,
-} from "@/lib/companion";
-import type { Lang } from "@/lib/types";
+} from "../../../../lib/companion";
+import type { Lang } from "../../../../lib/types";
 
 export const runtime = "nodejs";
 
@@ -20,7 +20,7 @@ type CompanionReplyResult = {
   }>;
 };
 
-type LlmProvider = "azure" | "openai";
+type LlmProvider = "gemini" | "azure" | "openai";
 
 function isLang(value: unknown): value is Lang {
   return value === "zh" || value === "en";
@@ -46,6 +46,26 @@ function extractOutputText(data: any): string | null {
 function extractChatText(data: any): string | null {
   const content = data?.choices?.[0]?.message?.content;
   return typeof content === "string" ? content : null;
+}
+
+function extractGeminiText(data: any): string | null {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return null;
+
+  const text = parts
+    .map((part: any) => (typeof part?.text === "string" ? part.text : ""))
+    .join("")
+    .trim();
+
+  return text || null;
+}
+
+function getGeminiConfig() {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+
+  if (!apiKey) return null;
+  return { apiKey, model };
 }
 
 function getAzureConfig() {
@@ -180,6 +200,43 @@ async function callAzureOpenAI(system: string, user: string, signal: AbortSignal
   return text ? { provider: "azure" as const, text } : null;
 }
 
+async function callGemini(system: string, user: string, signal: AbortSignal) {
+  const config = getGeminiConfig();
+  if (!config) return null;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent`,
+    {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": config.apiKey,
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: system }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: user }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 700,
+          temperature: 0.75,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) return null;
+  const text = extractGeminiText(await response.json());
+  return text ? { provider: "gemini" as const, text } : null;
+}
+
 async function callOpenAI(system: string, user: string, signal: AbortSignal) {
   const config = getOpenAIConfig();
   if (!config) return null;
@@ -212,7 +269,11 @@ async function callConfiguredLlm(system: string, user: string) {
   const timeout = setTimeout(() => controller.abort(), 6000);
 
   try {
-    return (await callAzureOpenAI(system, user, controller.signal)) ?? (await callOpenAI(system, user, controller.signal));
+    return (
+      (await callGemini(system, user, controller.signal)) ??
+      (await callAzureOpenAI(system, user, controller.signal)) ??
+      (await callOpenAI(system, user, controller.signal))
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -230,7 +291,7 @@ export async function POST(request: Request) {
 
   const fallback = generateCompanionReply(input, state, lang, now);
 
-  if (!getAzureConfig() && !getOpenAIConfig()) {
+  if (!getGeminiConfig() && !getAzureConfig() && !getOpenAIConfig()) {
     return NextResponse.json({ ...fallback, generatedBy: "local" });
   }
 
