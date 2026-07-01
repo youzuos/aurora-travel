@@ -1,6 +1,7 @@
 "use client";
 
 import type { CompanionAction, CompanionCharacter } from "@/lib/companion";
+import { getPixelCompanionMotionClass } from "@/lib/pixelCompanionMotion";
 
 interface Props {
   character: CompanionCharacter;
@@ -344,16 +345,7 @@ export default function PixelSpriteCompanion({ character, action, label, size = 
   const palette = PALETTES[character.animal];
   const sleepy = action === "sleepy";
   const sizeClass = size === "sm" ? "h-10 w-10" : size === "lg" ? "h-full w-full" : "h-14 w-14";
-  const motionClass =
-    action === "walking"
-      ? "pixel-walk"
-      : action === "excited"
-        ? "pixel-hop"
-        : action === "photo"
-          ? "pixel-photo"
-          : animated
-            ? "pixel-idle"
-            : "";
+  const motionClass = getPixelCompanionMotionClass(action, animated);
 
   return (
     <div
@@ -385,6 +377,15 @@ export default function PixelSpriteCompanion({ character, action, label, size = 
         .pixel-photo {
           animation: pixel-photo 1.4s steps(2, end) infinite;
         }
+        .pixel-food {
+          animation: pixel-food 1.1s steps(2, end) infinite;
+        }
+        .pixel-map {
+          animation: pixel-map 1.2s steps(2, end) infinite;
+        }
+        .pixel-sleepy {
+          animation: pixel-sleepy 2.2s steps(2, end) infinite;
+        }
         .pixel-flash {
           animation: pixel-flash 1.4s steps(2, end) infinite;
         }
@@ -406,6 +407,21 @@ export default function PixelSpriteCompanion({ character, action, label, size = 
         @keyframes pixel-photo {
           50% {
             transform: translateY(-1px);
+          }
+        }
+        @keyframes pixel-food {
+          50% {
+            transform: translate(0, 2px) rotate(-2deg);
+          }
+        }
+        @keyframes pixel-map {
+          50% {
+            transform: translateX(-2px) rotate(2deg);
+          }
+        }
+        @keyframes pixel-sleepy {
+          50% {
+            transform: translateY(2px) scaleY(0.97);
           }
         }
         @keyframes pixel-flash {

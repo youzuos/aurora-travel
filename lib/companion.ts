@@ -4,6 +4,7 @@ import {
   COMPANION_STORAGE_KEY,
   COMPANION_TIMING,
 } from "../data/companion";
+import { chooseInterestWeightedAction, pickInterestPromptLine } from "./companionBehavior";
 import type { Lang } from "./types";
 
 export { COMPANION_STORAGE_KEY, COMPANION_TIMING };
@@ -510,13 +511,19 @@ function actionForIntent(intent: Intent, state: CompanionState, now: number): Co
   if (intent === "photo") return "photo";
   if (intent === "food") return timeInfo.sleeping ? "sleepy" : "food";
   if (intent === "people" || intent === "scenery") return "excited";
-  return "idle";
+  return chooseInterestWeightedAction(state.selectedCharacterId, "idle", state.statusCursor, timeInfo.sleeping);
 }
 
 export function getCompanionAction(state: CompanionState, now = Date.now()): CompanionAction {
-  const { sleeping } = getCompanionLocalTimeInfo(state, now);
+  const { sleeping, meal } = getCompanionLocalTimeInfo(state, now);
   const inactiveMs = now - state.lastActiveAt;
   if (inactiveMs > 8 * 60 * 60 * 1000 || sleeping) return "sleepy";
+  if (
+    (meal === "breakfast" || meal === "lunch" || meal === "dinner") &&
+    (state.visualAction === "idle" || state.visualAction === "walking" || state.visualAction === "excited")
+  ) {
+    return "food";
+  }
   return state.visualAction;
 }
 
@@ -721,6 +728,24 @@ function expandInteractiveReply(message: CompanionMessage, intent: Exclude<Inten
   };
 }
 
+function withInterestLine(message: CompanionMessage, characterId: string | null | undefined, cursor: number): CompanionMessage {
+  const interestZh = pickInterestPromptLine(characterId, "zh", cursor);
+  const interestEn = pickInterestPromptLine(characterId, "en", cursor);
+
+  return {
+    ...message,
+    textZh: `${message.textZh} ${interestZh}`,
+    textEn: `${message.textEn} ${interestEn}`,
+    image: message.image
+      ? {
+          ...message.image,
+          captionZh: `${message.image.captionZh} ${interestZh}`,
+          captionEn: `${message.image.captionEn} ${interestEn}`,
+        }
+      : message.image,
+  };
+}
+
 export function generateCompanionReply(
   input: string,
   state: CompanionState,
@@ -774,7 +799,11 @@ export function generateCompanionReply(
   }
 
   const location = getCurrentLocation(state);
-  const reply = expandInteractiveReply(messageForIntent(intent, location, now + 450, state.statusCursor), intent);
+  const reply = withInterestLine(
+    expandInteractiveReply(messageForIntent(intent, location, now + 450, state.statusCursor), intent),
+    state.selectedCharacterId,
+    state.statusCursor
+  );
   return {
     state: {
       ...state,
@@ -806,7 +835,8 @@ export function addPassiveCompanionMessage(
 ): { state: CompanionState; message: CompanionMessage } {
   const { incrementUnread = true } = options;
   const location = getCurrentLocation(state);
-  const message = messageForIntent("status", location, now, state.statusCursor);
+  const message = withInterestLine(messageForIntent("status", location, now, state.statusCursor), state.selectedCharacterId, state.statusCursor);
+  const timeInfo = getCompanionLocalTimeInfo(state, now);
   return {
     state: {
       ...state,
@@ -814,7 +844,7 @@ export function addPassiveCompanionMessage(
       statusCursor: state.statusCursor + 1,
       messageHistory: appendMessages(state.messageHistory, [message]),
       unreadCount: nextUnreadCount(state.unreadCount, incrementUnread),
-      visualAction: getCompanionLocalTimeInfo(state, now).sleeping ? "sleepy" : "walking",
+      visualAction: chooseInterestWeightedAction(state.selectedCharacterId, "walking", state.statusCursor, timeInfo.sleeping),
     },
     message,
   };

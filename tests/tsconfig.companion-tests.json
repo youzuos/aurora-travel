@@ -17,6 +17,8 @@
     "../app/api/companion/ip-hint/route.ts",
     "../app/api/companion/reply/route.ts",
     "../lib/companion.ts",
+    "../lib/companionBehavior.ts",
+    "../lib/pixelCompanionMotion.ts",
     "../lib/companionExploration.ts",
     "../data/companion.ts",
     "../lib/types.ts"

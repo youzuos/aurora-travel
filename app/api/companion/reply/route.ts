@@ -8,6 +8,7 @@ import {
   type CompanionMessage,
   type CompanionState,
 } from "../../../../lib/companion";
+import { getCompanionBehaviorProfile, pickInterestPromptLine } from "../../../../lib/companionBehavior";
 import type { Lang } from "../../../../lib/types";
 
 export const runtime = "nodejs";
@@ -132,11 +133,33 @@ function applyLlmMessages(
 function createLlmPrompt(input: string, lang: Lang, state: CompanionState, now: number) {
   const location = getCurrentLocation(state);
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
+  const behavior = getCompanionBehaviorProfile(state.selectedCharacterId);
   const timeInfo = getCompanionLocalTimeInfo(state, now);
   const agentMessages = state.messageHistory.filter((message) => message.sender === "agent").slice(-3);
 
-  const system =
-    "You write as Aurora's tiny pixel travel companion. Keep the persona cute, vivid, human-like, and concise. Do not change destination, message ids, media type, or app state. Return JSON only.";
+  const characterStyle = character
+    ? `Selected companion: ${character.nameEn}, a ${character.animal}. Personality: ${character.personalityEn} Travel preference tags: ${character.tagsEn.join(
+        ", "
+      )}. Interest behavior tags: ${behavior.interestTags.join(", ")}. Preferred visible actions: ${behavior.preferredActions.join(
+        ", "
+      )}. Habit line examples: ${pickInterestPromptLine(character.id, "en", 0)} / ${pickInterestPromptLine(
+        character.id,
+        "en",
+        1
+      )}. Specific behavior rule: ${behavior.llmGuidance}. Make the reply's observations, tone, and choices genuinely reflect these preferences.`
+    : "No companion has been selected yet; keep the reply warm and generally travel-oriented.";
+
+  const system = [
+    "You write as Aurora's tiny pixel travel companion.",
+    characterStyle,
+    "The companion is not a generic assistant: it has its own taste, habits, and travel bias.",
+    "Interest behavior must affect what it notices, what it wants to do next, and the sensory details it chooses.",
+    "If the companion loves food, mention smells, snacks, markets, or meals more often; if it loves night or aurora, lean into evening light and skies; if it loves maps, quiet, people, photos, cold, or details, let that preference shape what it notices.",
+    "Respect the current city local time: sleepy or night hours should feel quieter; mealtimes may include food; daytime can include walking, photos, and people.",
+    "Keep the persona cute, vivid, human-like, and concise.",
+    "Do not change destination, message ids, media type, or app state.",
+    "Return JSON only.",
+  ].join(" ");
 
   const user = JSON.stringify({
     userLanguage: lang,
@@ -146,6 +169,14 @@ function createLlmPrompt(input: string, lang: Lang, state: CompanionState, now: 
           zh: character.nameZh,
           en: character.nameEn,
           animal: character.animal,
+          personalityZh: character.personalityZh,
+          personalityEn: character.personalityEn,
+          tagsZh: character.tagsZh,
+          tagsEn: character.tagsEn,
+          interestTags: behavior.interestTags,
+          preferredActions: behavior.preferredActions,
+          interestPromptZh: pickInterestPromptLine(character.id, "zh", now),
+          interestPromptEn: pickInterestPromptLine(character.id, "en", now),
         }
       : null,
     currentLocation: {

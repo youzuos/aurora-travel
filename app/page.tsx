@@ -8,12 +8,12 @@ import TripView from "@/components/TripView";
 import ChatOverlay from "@/components/ChatOverlay";
 import CompanionBubble from "@/components/CompanionBubble";
 import CompanionChat from "@/components/CompanionChat";
+import CompanionDestinationOnboarding from "@/components/CompanionDestinationOnboarding";
 import CompanionInspirationRadar from "@/components/CompanionInspirationRadar";
 import CompanionOnboarding from "@/components/CompanionOnboarding";
 import CompanionStatus from "@/components/CompanionStatus";
 import PriceAlert from "@/components/PriceAlert";
 import MaturitySummary from "@/components/MaturitySummary";
-import { XIAOMING_DEMO_PLAN } from "@/data/demoScenarios";
 import type {
   AgentFinding,
   DeferredTrip,
@@ -36,6 +36,7 @@ import {
 
 const PLAN_KEY = "aurora.plan.v1";
 const LANG_KEY = "aurora.lang.v1";
+const DESTINATION_ONBOARDING_KEY = "aurora.destinationOnboarding.v1";
 
 export default function Home() {
   const [lang, setLang] = useState<Lang>("zh");
@@ -45,6 +46,8 @@ export default function Home() {
   const [timeWarpOpen, setTimeWarpOpen] = useState(false);
   const [companionState, setCompanionState] = useState<CompanionState>(() => createDefaultCompanionState());
   const [companionStateReady, setCompanionStateReady] = useState(false);
+  const [destinationOnboardingReady, setDestinationOnboardingReady] = useState(false);
+  const [destinationOnboardingDone, setDestinationOnboardingDone] = useState(false);
   const [companionChatOpen, setCompanionChatOpen] = useState(false);
   const [plannerSeed, setPlannerSeed] = useState<WishlistItem[]>([]);
   const [profile, setProfile] = useState<PlanProfile | null>(null);
@@ -65,10 +68,15 @@ export default function Home() {
         setTrips(plan.trips ?? []);
         setDeferredTrips(plan.deferredTrips ?? []);
         setFindings(plan.findings ?? []);
+        if ((plan.trips ?? []).length > 0) setDestinationOnboardingDone(true);
       } catch {
         window.localStorage.removeItem(PLAN_KEY);
       }
     }
+    if (window.localStorage.getItem(DESTINATION_ONBOARDING_KEY) === "done") {
+      setDestinationOnboardingDone(true);
+    }
+    setDestinationOnboardingReady(true);
 
     const savedCompanion = parseCompanionState(window.localStorage.getItem(COMPANION_STORAGE_KEY));
     setCompanionState(maybeAdvanceCompanionLocation(savedCompanion ?? createDefaultCompanionState()));
@@ -83,6 +91,15 @@ export default function Home() {
     if (!companionStateReady) return;
     window.localStorage.setItem(COMPANION_STORAGE_KEY, serializeCompanionState(companionState));
   }, [companionState, companionStateReady]);
+
+  useEffect(() => {
+    if (!destinationOnboardingReady) return;
+    if (destinationOnboardingDone) {
+      window.localStorage.setItem(DESTINATION_ONBOARDING_KEY, "done");
+    } else {
+      window.localStorage.removeItem(DESTINATION_ONBOARDING_KEY);
+    }
+  }, [destinationOnboardingDone, destinationOnboardingReady]);
 
   useEffect(() => {
     if (!companionStateReady) return;
@@ -132,6 +149,15 @@ export default function Home() {
     openPlanner(seed);
   }
 
+  function completeDestinationOnboarding() {
+    setDestinationOnboardingDone(true);
+  }
+
+  function openPlannerFromDestination(seed: WishlistItem[]) {
+    completeDestinationOnboarding();
+    openPlanner(seed);
+  }
+
   function applyPlan(plan: GeneratedPlan) {
     setProfile(plan.profile);
     setTrips(plan.trips);
@@ -141,6 +167,7 @@ export default function Home() {
     setTimeWarpOpen(false);
     setWarp("year-start");
     setPlannerSeed([]);
+    setDestinationOnboardingDone(true);
     window.localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
   }
 
@@ -165,6 +192,14 @@ export default function Home() {
     setWarp("year-start");
     window.localStorage.removeItem(PLAN_KEY);
   }
+
+  const destinationOnboardingActive =
+    companionStateReady &&
+    destinationOnboardingReady &&
+    companionState.onboardingCompleted &&
+    !hasPlan &&
+    !selectedTrip &&
+    !destinationOnboardingDone;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-white via-ink-50/40 to-white">
@@ -212,7 +247,18 @@ export default function Home() {
 
         {companionStateReady ? <CompanionStatus lang={lang} state={companionState} onOpen={openCompanionChat} /> : null}
 
-        {companionStateReady && !selectedTrip ? (
+        {destinationOnboardingActive ? (
+          <CompanionDestinationOnboarding
+            lang={lang}
+            state={companionState}
+            warp={warp}
+            onStateChange={setCompanionState}
+            onAddWishlistItems={openPlannerFromDestination}
+            onComplete={completeDestinationOnboarding}
+          />
+        ) : null}
+
+        {companionStateReady && !destinationOnboardingActive && !selectedTrip ? (
           <CompanionInspirationRadar
             lang={lang}
             state={companionState}
@@ -221,21 +267,6 @@ export default function Home() {
             onAddWishlistItems={openPlanner}
           />
         ) : null}
-
-        {!hasPlan && (
-          <YearView
-            lang={lang}
-            warp={warp}
-            trips={trips}
-            deferredTrips={deferredTrips}
-            profile={profile}
-            onSelectTrip={setSelectedTrip}
-            onOpenPlanner={() => openPlanner()}
-            onStartWithWishlist={openPlanner}
-            onLoadDemo={() => applyPlan(XIAOMING_DEMO_PLAN)}
-            onOpenTimeWarp={() => setTimeWarpOpen(true)}
-          />
-        )}
 
         {hasPlan && !selectedTrip && (
           <>

@@ -41,14 +41,14 @@ export default function CompanionStatus({ lang, state, onOpen }: Props) {
           action={action}
           label={copy(lang, character.nameZh, character.nameEn)}
           size="md"
-          animated={false}
+          animated
         />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-aurora-700">
           <span>{copy(lang, "旅伴近况", "Companion update")}</span>
           <span className="h-1 w-1 rounded-full bg-aurora-300" />
-          <span>{lang === "zh" ? location.cityZh : location.cityEn}</span>
+          <span>{lang === "zh" ? location.countryZh : location.countryEn}</span>
           <span className="h-1 w-1 rounded-full bg-aurora-300" />
           <span>{lang === "zh" ? timeInfo.labelZh : timeInfo.labelEn}</span>
         </div>

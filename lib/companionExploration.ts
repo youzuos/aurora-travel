@@ -1,4 +1,5 @@
 import { COMPANION_LOCATIONS } from "../data/companion";
+import { getCompanionBehaviorProfile } from "./companionBehavior";
 import type { CompanionState } from "./companion";
 import type { WarpStop } from "./time";
 import type { WishlistItem } from "./types";
@@ -54,6 +55,17 @@ const COUNTRY_CODE_TO_NAME: Record<string, string> = {
   JP: "Japan",
   NL: "Netherlands",
   NO: "Norway",
+};
+
+const CHARACTER_PREFERENCE_TAGS: Record<string, string[]> = {
+  aoki: ["rain", "river", "lake", "temple", "quiet", "blossom"],
+  mira: ["city", "cafe", "river", "museum", "neon", "square"],
+  lumo: ["night", "neon", "aurora", "city", "harbor"],
+  piko: ["food", "street", "breakfast", "chocolate", "cafe"],
+  nori: ["train", "canal", "temple", "city", "maps"],
+  bobo: ["people", "quiet", "village", "square", "slow"],
+  toto: ["aurora", "cold", "winter", "harbor", "snow"],
+  momo: ["quiet", "museum", "temple", "canal", "details"],
 };
 
 const EXPLORATION_METADATA: Record<string, ExplorationMetadata> = {
@@ -342,6 +354,11 @@ export type CompanionExplorationOptions = {
   ipHint?: CompanionIpHint | null;
 };
 
+export type CompanionDiscoveryOptions = CompanionExplorationOptions & {
+  limit?: number;
+  preference?: string;
+};
+
 function normalize(value: string) {
   return value.trim().toLowerCase();
 }
@@ -363,6 +380,39 @@ function countryNamesForCode(countryCode: string) {
   return countryEn ? [countryEn.toLowerCase()] : [];
 }
 
+const CITY_INPUT_ALIASES: Record<string, string> = {
+  "\u4eac\u90fd": "kyoto",
+  "\u5927\u962a": "osaka",
+  "\u5948\u826f": "nara",
+  "\u96f7\u514b\u96c5\u672a\u514b": "reykjavik",
+  "\u6f20\u6cb3": "mohe",
+  "\u6b66\u6c49": "wuhan",
+  "\u957f\u767d\u5c71": "changbai",
+  "\u5580\u7eb3\u65af": "kanas",
+  "\u7279\u7f57\u59c6\u745f": "tromso",
+  "\u7279\u7f57\u59c6\u7d22": "tromso",
+  "\u5df4\u9ece": "paris",
+  "\u963f\u59c6\u65af\u7279\u4e39": "amsterdam",
+  "\u5e03\u9c81\u585e\u5c14": "brussels",
+};
+
+const COUNTRY_INPUT_ALIASES: Record<string, string> = {
+  "\u65e5\u672c": "JP",
+  japan: "JP",
+  "\u4e2d\u56fd": "CN",
+  china: "CN",
+  "\u51b0\u5c9b": "IS",
+  iceland: "IS",
+  "\u6cd5\u56fd": "FR",
+  france: "FR",
+  "\u8377\u5170": "NL",
+  netherlands: "NL",
+  "\u632a\u5a01": "NO",
+  norway: "NO",
+  "\u6bd4\u5229\u65f6": "BE",
+  belgium: "BE",
+};
+
 function seededIndex(length: number, seed: number) {
   if (length <= 1) return 0;
   const value = Math.abs(Math.imul(seed || 1, 2654435761));
@@ -370,12 +420,19 @@ function seededIndex(length: number, seed: number) {
 }
 
 function cityMatches(location: Location, value: string) {
-  return normalize(location.cityEn) === value || normalize(location.cityZh) === value;
+  const aliasId = CITY_INPUT_ALIASES[value];
+  return (
+    location.id === aliasId ||
+    normalize(location.cityEn) === value ||
+    normalize(location.cityZh) === value
+  );
 }
 
 function countryMatches(location: Location, value: string) {
   const meta = metadataFor(location);
+  const aliasCode = COUNTRY_INPUT_ALIASES[value];
   return (
+    meta.countryCode === aliasCode ||
     normalize(location.countryEn) === value ||
     normalize(location.countryZh) === value ||
     meta.countryCode.toLowerCase() === value ||
@@ -410,7 +467,28 @@ function tagsFromInput(input: string) {
   const value = normalize(input);
   const directTags = new Set<string>();
 
-  for (const [alias, tags] of Object.entries(TAG_ALIASES)) {
+  const cleanTagAliases: Record<string, string[]> = {
+    "\u6d77\u8fb9": ["seaside", "harbor", "canal", "river", "lake"],
+    "\u6d77": ["seaside", "harbor"],
+    "\u7f8e\u98df": ["food", "cafe", "chocolate", "breakfast"],
+    "\u5c0f\u5403": ["food", "cafe", "chocolate", "breakfast"],
+    "\u5403": ["food", "cafe", "chocolate", "breakfast"],
+    "\u96ea": ["snow", "winter", "cold"],
+    "\u51ac\u5929": ["snow", "winter", "cold"],
+    "\u6781\u5149": ["aurora"],
+    "\u6a31\u82b1": ["blossom"],
+    "\u5c71": ["mountain", "snow"],
+    "\u96ea\u5c71": ["mountain", "snow"],
+    "\u53e4\u57ce": ["ancient", "temple", "quiet"],
+    "\u5b89\u9759": ["quiet", "nature", "village"],
+    "\u5c0f\u4f17": ["quiet", "nature", "village"],
+    "\u81ea\u7136": ["nature", "forest", "lake", "mountain"],
+    "\u57ce\u5e02": ["city", "museum", "cafe", "neon"],
+    "\u591c\u666f": ["night", "neon", "city"],
+    "\u535a\u7269\u9986": ["museum", "city"],
+  };
+
+  for (const [alias, tags] of Object.entries({ ...TAG_ALIASES, ...cleanTagAliases })) {
     if (value.includes(alias)) {
       tags.forEach((tag) => directTags.add(tag));
     }
@@ -422,6 +500,19 @@ function tagsFromInput(input: string) {
 function locationScoreForTags(location: Location, tags: string[]) {
   const locationTags = new Set(metadataFor(location).tags);
   return tags.filter((tag) => locationTags.has(tag)).length;
+}
+
+function characterPreferenceScore(location: Location, state: CompanionState) {
+  const sharedPreferences = getCompanionBehaviorProfile(state.selectedCharacterId).interestTags;
+  const preferences = sharedPreferences.length
+    ? sharedPreferences
+    : state.selectedCharacterId
+      ? CHARACTER_PREFERENCE_TAGS[state.selectedCharacterId] ?? []
+      : [];
+  if (!preferences.length) return 0;
+
+  const locationTags = new Set(metadataFor(location).tags);
+  return preferences.filter((tag) => locationTags.has(tag)).length;
 }
 
 function distanceKm(a: Coordinates, b: Coordinates) {
@@ -463,12 +554,24 @@ function createFinding(location: Location, source: CompanionExplorationSource, o
   } satisfies CompanionFinding;
 }
 
-function chooseRandom(locations: Location[], currentId: string, seed: number) {
+function chooseWithCharacterPreference(locations: Location[], state: CompanionState, seed: number) {
+  const currentId = state.currentLocationId;
   const candidates = locations.filter((location) => location.id !== currentId);
-  return candidates[seededIndex(candidates.length, seed)] ?? locations[0];
+  if (!candidates.length) return locations[0];
+
+  const ranked = candidates
+    .map((location) => ({
+      location,
+      score: characterPreferenceScore(location, state),
+    }))
+    .sort((a, b) => b.score - a.score || a.location.id.localeCompare(b.location.id));
+
+  const bestScore = ranked[0]?.score ?? 0;
+  const pool = bestScore > 0 ? ranked.filter((item) => item.score === bestScore).map((item) => item.location) : candidates;
+  return pool[seededIndex(pool.length, seed)] ?? candidates[0];
 }
 
-function chooseByIpHint(ipHint: CompanionIpHint | null | undefined, currentId: string, seed: number) {
+function chooseByIpHint(ipHint: CompanionIpHint | null | undefined, state: CompanionState, seed: number) {
   if (!ipHint?.countryCode) return null;
   const countryNames = countryNamesForCode(ipHint.countryCode);
   const candidates = COMPANION_LOCATIONS.filter((location) => {
@@ -478,7 +581,48 @@ function chooseByIpHint(ipHint: CompanionIpHint | null | undefined, currentId: s
       countryNames.includes(normalize(location.countryEn))
     );
   });
-  return candidates.length ? chooseRandom(candidates, currentId, seed) : null;
+  return candidates.length ? chooseWithCharacterPreference(candidates, state, seed) : null;
+}
+
+function countryCandidatesFromInput(value: string) {
+  return COMPANION_LOCATIONS.filter((location) => countryMatches(location, value));
+}
+
+function sourceForRankedInput(input: string, tags: string[], ipHint: CompanionIpHint | null | undefined) {
+  const value = normalize(input);
+  if (value && countryCandidatesFromInput(value).length) return "country-match" satisfies CompanionExplorationSource;
+  if (tags.length) return "tag-match" satisfies CompanionExplorationSource;
+  if (ipHint?.countryCode) return "ip-hint" satisfies CompanionExplorationSource;
+  return "random" satisfies CompanionExplorationSource;
+}
+
+function rankedDiscoveryCandidates(input: string, state: CompanionState, options: CompanionDiscoveryOptions) {
+  const current = getCurrentLocation(state);
+  const value = normalize([input, options.preference].filter(Boolean).join(" "));
+  const tags = tagsFromInput(value);
+  const countryCandidates = value ? countryCandidatesFromInput(value) : [];
+  const ipCode = options.ipHint?.countryCode?.toUpperCase();
+  const seed = options.now ?? Date.now();
+
+  let candidates = [...COMPANION_LOCATIONS].filter((location) => location.id !== current.id);
+  if (countryCandidates.length) {
+    candidates = countryCandidates.filter((location) => location.id !== current.id);
+  }
+
+  return candidates
+    .map((location) => {
+      const meta = metadataFor(location);
+      const tagScore = locationScoreForTags(location, tags);
+      const preferenceScore = characterPreferenceScore(location, state);
+      const neighborScore = (current.neighbors as readonly string[]).includes(location.id) ? 1 : 0;
+      const ipScore = ipCode && meta.countryCode === ipCode ? 2 : 0;
+      const rotationScore = seededIndex(7, seed + location.id.length);
+      return {
+        location,
+        score: tagScore * 10 + preferenceScore * 4 + ipScore * 3 + neighborScore * 2 + rotationScore,
+      };
+    })
+    .sort((a, b) => b.score - a.score || a.location.id.localeCompare(b.location.id));
 }
 
 function chooseNearby(current: Location) {
@@ -514,7 +658,7 @@ export function resolveCompanionExploration(
 
     const countryCandidates = COMPANION_LOCATIONS.filter((location) => countryMatches(location, value));
     if (countryCandidates.length) {
-      return createFinding(chooseRandom(countryCandidates, current.id, now), "country-match", { now, warp });
+      return createFinding(chooseWithCharacterPreference(countryCandidates, state, now), "country-match", { now, warp });
     }
 
     const tags = tagsFromInput(input);
@@ -524,13 +668,51 @@ export function resolveCompanionExploration(
     }))
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score);
-    if (tagged.length) return createFinding(tagged[seededIndex(Math.min(3, tagged.length), now)].location, "tag-match", { now, warp });
+    if (tagged.length) {
+      const topScore = tagged[0]?.score ?? 0;
+      const topTagged = tagged.filter((item) => item.score === topScore).map((item) => item.location);
+      return createFinding(chooseWithCharacterPreference(topTagged, state, now), "tag-match", { now, warp });
+    }
   }
 
-  const ipLocation = chooseByIpHint(options.ipHint, current.id, now);
+  const ipLocation = chooseByIpHint(options.ipHint, state, now);
   if (ipLocation) return createFinding(ipLocation, "ip-hint", { now, warp });
 
-  return createFinding(chooseRandom([...COMPANION_LOCATIONS], current.id, now), "random", { now, warp });
+  return createFinding(chooseWithCharacterPreference([...COMPANION_LOCATIONS], state, now), "random", { now, warp });
+}
+
+export function resolveCompanionDiscovery(
+  input: string,
+  state: CompanionState,
+  options: CompanionDiscoveryOptions = {}
+): CompanionFinding[] {
+  const now = options.now ?? Date.now();
+  const warp = options.warp ?? "year-start";
+  const limit = Math.max(1, Math.min(3, options.limit ?? 3));
+  const value = normalize(input);
+
+  if (value) {
+    const city = COMPANION_LOCATIONS.find((location) => cityMatches(location, value));
+    if (city) return [createFinding(city, "direct-input", { now, warp })];
+  }
+
+  if (options.mode === "nearby") {
+    const current = getCurrentLocation(state);
+    const nearby = chooseNearby(current);
+    return [createFinding(nearby.location, "nearby", { now, warp, distanceKm: nearby.distanceKm })];
+  }
+
+  const combinedInput = [input, options.preference].filter(Boolean).join(" ");
+  const tags = tagsFromInput(combinedInput);
+  const source = sourceForRankedInput(combinedInput, tags, options.ipHint);
+  const ranked = rankedDiscoveryCandidates(input, state, { ...options, now });
+
+  return ranked.slice(0, limit).map((item, index) =>
+    createFinding(item.location, source, {
+      now: now + index,
+      warp,
+    })
+  );
 }
 
 export function companionFindingToWishlistItem(finding: CompanionFinding): WishlistItem {

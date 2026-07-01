@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import CompanionActionShowcase from "@/components/CompanionActionShowcase";
 import CompanionInspirationRadar from "@/components/CompanionInspirationRadar";
 import PixelCompanion from "@/components/PixelSpriteCompanion";
 import {
@@ -38,6 +39,14 @@ function speak(text: string, lang: Lang) {
   utterance.lang = lang === "zh" ? "zh-CN" : "en-US";
   utterance.rate = 0.95;
   window.speechSynthesis.speak(utterance);
+}
+
+function timeMoodLabel(timeInfo: ReturnType<typeof getCompanionLocalTimeInfo>, lang: Lang) {
+  if (timeInfo.sleeping) return lang === "zh" ? "夜间休息" : "Night rest";
+  if (timeInfo.meal === "breakfast") return lang === "zh" ? "早餐时间" : "Breakfast time";
+  if (timeInfo.meal === "lunch") return lang === "zh" ? "午餐时间" : "Lunch time";
+  if (timeInfo.meal === "dinner") return lang === "zh" ? "晚餐时间" : "Dinner time";
+  return lang === "zh" ? "醒着闲逛" : "Awake and wandering";
 }
 
 function PhotoCard({ message, lang }: { message: CompanionMessage; lang: Lang }) {
@@ -90,6 +99,7 @@ export default function CompanionChat({
   const messages = useMemo(() => state.messageHistory.slice(-40), [state.messageHistory]);
   const action = getCompanionAction(state);
   const timeInfo = getCompanionLocalTimeInfo(state);
+  const localTime = `${timeInfo.hour.toString().padStart(2, "0")}:00`;
 
   useEffect(() => {
     if (!open || state.unreadCount === 0) return;
@@ -155,7 +165,7 @@ export default function CompanionChat({
                   action={action}
                   label={lang === "zh" ? character.nameZh : character.nameEn}
                   size="sm"
-                  animated={false}
+                  animated
                 />
               </div>
               <div className="min-w-0">
@@ -201,6 +211,16 @@ export default function CompanionChat({
               </button>
             </div>
           </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ink-50 px-3 py-2 text-[11px] text-ink-600">
+            <span className="font-medium text-ink-800">
+              {lang === "zh" ? "小动物所在城市时间" : "Companion local time"}
+            </span>
+            <span className="font-semibold text-aurora-700">
+              {lang === "zh" ? location.cityZh : location.cityEn} · {localTime} · {timeMoodLabel(timeInfo, lang)}
+            </span>
+          </div>
+          <CompanionActionShowcase lang={lang} character={character} currentAction={action} />
         </div>
 
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-ink-50/50 px-4 py-4">
