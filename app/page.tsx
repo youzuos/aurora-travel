@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import TopBar from "@/components/TopBar";
 import TimeWarp from "@/components/TimeWarp";
 import YearView from "@/components/YearView";
@@ -33,6 +33,7 @@ import {
   serializeCompanionState,
   type CompanionState,
 } from "@/lib/companion";
+import { getCompanionScene } from "@/lib/companionScene";
 
 const PLAN_KEY = "aurora.plan.v1";
 const LANG_KEY = "aurora.lang.v1";
@@ -200,9 +201,13 @@ export default function Home() {
     !hasPlan &&
     !selectedTrip &&
     !destinationOnboardingDone;
+  const companionScene = getCompanionScene(companionState);
+  const companionSceneStyle = {
+    "--companion-scene-photo": `url("${companionScene.pixelPhotoSrc}")`,
+  } as CSSProperties;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-white via-ink-50/40 to-white">
+    <main className={`travel-pixel-shell ${companionScene.className}`} style={companionSceneStyle}>
       <TopBar
         lang={lang}
         onOpenPlanner={() => openPlanner()}
@@ -211,7 +216,7 @@ export default function Home() {
       />
 
       <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-8 space-y-6">
-        <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <section className="travel-hero flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <div className="text-[11px] uppercase tracking-[0.22em] text-ink-500 font-medium">
               {lang === "zh" ? "Plan once · Refine all year" : "Plan once · Refine all year"}

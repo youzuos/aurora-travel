@@ -150,20 +150,16 @@ export default function CompanionInspirationRadar({
   }
 
   return (
-    <section
-      className={`overflow-hidden rounded-xl border hairline bg-white shadow-[0_1px_2px_rgba(20,30,50,0.04)] ${
-        compact ? "" : "border-aurora-100"
-      }`}
-    >
-      <div className={`grid gap-0 ${compact ? "grid-cols-1" : "lg:grid-cols-[1.05fr_0.95fr]"}`}>
-        <div className="p-4 sm:p-5">
+    <section className={`${compact ? "rounded-xl border hairline bg-white/95" : "travel-ticket-card overflow-hidden rounded-xl border-aurora-100"}`}>
+      <div className={`grid gap-0 ${compact || !finding ? "grid-cols-1" : "lg:grid-cols-[1.05fr_0.95fr]"}`}>
+        <div className={compact ? "p-3" : "p-4 sm:p-5"}>
           <div className="flex items-start gap-3">
-            <div className="relative h-12 w-12 shrink-0">
+            <div className={`${compact ? "h-10 w-10" : "h-12 w-12"} relative shrink-0`}>
               <PixelCompanion
                 character={character}
                 action="map"
                 label={copy(lang, character.nameZh, character.nameEn)}
-                size="md"
+                size={compact ? "sm" : "md"}
                 animated={!compact}
               />
             </div>
@@ -171,10 +167,10 @@ export default function CompanionInspirationRadar({
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-aurora-700">
                 {copy(lang, "小动物灵感雷达", "Companion radar")}
               </div>
-              <h2 className={`${compact ? "text-[15px]" : "text-[20px]"} mt-1 font-semibold tracking-tight text-ink-900`}>
+              <h2 className={`${compact ? "text-[14px]" : "text-[20px]"} mt-1 font-semibold tracking-tight text-ink-900`}>
                 {copy(lang, "让它先去替你探路", "Let it scout ahead")}
               </h2>
-              <div className="mt-1 text-[12px] leading-relaxed text-ink-500">
+              <div className={`${compact ? "hidden sm:block" : ""} mt-1 text-[12px] leading-relaxed text-ink-500`}>
                 {copy(
                   lang,
                   `现在在 ${location.cityZh}。你可以写城市、国家或想要的氛围，也可以直接随机出发。`,
@@ -184,7 +180,7 @@ export default function CompanionInspirationRadar({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <div className={`${compact ? "mt-3" : "mt-4"} grid gap-2 sm:grid-cols-[1fr_auto]`}>
             <input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -203,7 +199,7 @@ export default function CompanionInspirationRadar({
             </button>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {SUGGESTIONS.map((item) => (
               <button
                 key={item.en}
@@ -216,26 +212,32 @@ export default function CompanionInspirationRadar({
             ))}
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => explore("random")}
-              className="rounded-lg border hairline bg-ink-50 px-3 py-2 text-[12px] font-medium text-ink-700 hover:bg-white"
+              className="rounded-xl border border-aurora-200 bg-white px-3 py-2.5 text-[12px] font-semibold text-aurora-800 shadow-sm hover:bg-aurora-50"
             >
               {copy(lang, "随机出发", "Random start")}
             </button>
             <button
               type="button"
               onClick={() => explore("nearby")}
-              className="rounded-lg border hairline bg-ink-50 px-3 py-2 text-[12px] font-medium text-ink-700 hover:bg-white"
+              className="rounded-xl bg-aurora-700 px-3 py-2.5 text-[12px] font-semibold text-white shadow-sm hover:bg-ink-900"
             >
               {copy(lang, "继续附近探索", "Explore nearby")}
             </button>
           </div>
+
+          {!finding && !compact ? (
+            <p className="mt-3 text-[11px] leading-relaxed text-ink-400">
+              {copy(lang, "探到喜欢的地方后，可以直接加入年度愿望。", "When a place feels right, add it to your annual wishes.")}
+            </p>
+          ) : null}
         </div>
 
-        <div className="border-t hairline bg-ink-50/60 p-4 sm:p-5 lg:border-l lg:border-t-0">
-          {finding ? (
+        {finding ? (
+          <div className="border-t hairline bg-ink-50/60 p-4 sm:p-5 lg:border-l lg:border-t-0">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-aurora-700">
                 <span>{sourceLabel(lang, finding.source)}</span>
@@ -284,27 +286,8 @@ export default function CompanionInspirationRadar({
                 {finding.addedToWishlist ? copy(lang, "已加入本次旅行清单", "Added to trip wishes") : copy(lang, "加入本次旅行清单", "Add to trip wishes")}
               </button>
             </div>
-          ) : (
-            <div className="flex h-full min-h-[190px] flex-col justify-between rounded-lg border hairline bg-white p-4">
-              <div>
-                <div className="text-[12px] font-semibold text-ink-900">{copy(lang, "下一站会变成计划灵感", "The next stop can become a trip idea")}</div>
-                <p className="mt-2 text-[12px] leading-relaxed text-ink-500">
-                  {copy(
-                    lang,
-                    "小动物会发来城市见闻、照片和随时间细化的建议；你感兴趣时可以直接加入年度愿望。",
-                    "Your companion sends notes, photos, and time-aware planning detail; add anything interesting to your annual wishes."
-                  )}
-                </p>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2 text-[10.5px] text-ink-500">
-                <span className="rounded-full bg-ink-50 px-2.5 py-1">{copy(lang, "城市", "City")}</span>
-                <span className="rounded-full bg-ink-50 px-2.5 py-1">{copy(lang, "国家", "Country")}</span>
-                <span className="rounded-full bg-ink-50 px-2.5 py-1">{copy(lang, "氛围", "Mood")}</span>
-                <span className="rounded-full bg-ink-50 px-2.5 py-1">{copy(lang, "附近", "Nearby")}</span>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

@@ -8,6 +8,10 @@
   --line: #e7eaef;
   --text: #1c1f26;
   --muted: #737c8e;
+  --map-paper: #fffaf0;
+  --map-grid: rgba(48, 102, 148, 0.08);
+  --stamp-red: #c95b4f;
+  --leaf: #477264;
 }
 
 * {
@@ -54,6 +58,566 @@ body {
 
 .hairline {
   border-color: var(--line);
+}
+
+.travel-pixel-shell {
+  --companion-scene-photo: none;
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    linear-gradient(90deg, var(--map-grid) 1px, transparent 1px),
+    linear-gradient(0deg, var(--map-grid) 1px, transparent 1px),
+    radial-gradient(circle at 16% 10%, rgba(201, 91, 79, 0.12), transparent 28%),
+    radial-gradient(circle at 84% 18%, rgba(71, 114, 100, 0.12), transparent 26%),
+    linear-gradient(180deg, #fffdf8 0%, #f6fbff 48%, #fffaf0 100%);
+  background-size: 18px 18px, 18px 18px, auto, auto, auto;
+}
+
+.travel-pixel-shell::before {
+  content: "";
+  position: fixed;
+  inset: 94px 0 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.56;
+  background-repeat: no-repeat;
+  background-position: left 22%, center 48%, right 78%, center bottom;
+  background-size: min(560px, 78%) 270px, 100% 180px, min(520px, 72%) 240px, 100% 100%;
+}
+
+.travel-pixel-shell::after {
+  content: "";
+  position: fixed;
+  inset: 94px 0 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.46;
+  background-repeat: no-repeat;
+  background-position: 8% 18%, 92% 30%, 50% 82%;
+  background-size: 220px 160px, 260px 180px, 100% 160px;
+}
+
+.travel-pixel-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.travel-pixel-shell.scene-heritage::before {
+  background-image:
+    linear-gradient(135deg, transparent 0 48%, rgba(151, 75, 55, 0.34) 48% 57%, transparent 57%),
+    repeating-linear-gradient(90deg, rgba(94, 66, 50, 0.2) 0 18px, rgba(255, 244, 226, 0.28) 18px 36px, transparent 36px 58px),
+    linear-gradient(90deg, transparent 0 18%, rgba(83, 116, 82, 0.26) 18% 30%, transparent 30% 66%, rgba(121, 82, 56, 0.24) 66% 76%, transparent 76%),
+    linear-gradient(180deg, transparent 0%, rgba(236, 216, 188, 0.48) 72%, rgba(210, 186, 155, 0.56) 100%);
+}
+
+.travel-pixel-shell.scene-city::before {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(38, 56, 78, 0.28) 0 24px, transparent 24px 36px, rgba(68, 94, 119, 0.22) 36px 62px),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(255, 203, 112, 0.34) 18px 24px, transparent 24px 52px),
+    linear-gradient(90deg, transparent 0 15%, rgba(62, 84, 102, 0.22) 15% 20%, transparent 20% 70%, rgba(62, 84, 102, 0.2) 70% 76%, transparent 76%),
+    linear-gradient(180deg, transparent 0%, rgba(216, 226, 234, 0.5) 70%, rgba(190, 202, 213, 0.56) 100%);
+}
+
+.travel-pixel-shell.scene-cafe::before {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(142, 86, 52, 0.24) 0 34px, rgba(255, 237, 206, 0.36) 34px 68px, transparent 68px 92px),
+    linear-gradient(90deg, transparent 0 13%, rgba(95, 58, 39, 0.28) 13% 20%, transparent 20% 63%, rgba(57, 94, 75, 0.24) 63% 75%, transparent 75%),
+    linear-gradient(90deg, transparent 0 10%, rgba(245, 180, 94, 0.32) 10% 30%, transparent 30% 68%, rgba(245, 180, 94, 0.26) 68% 84%, transparent 84%),
+    linear-gradient(180deg, transparent 0%, rgba(234, 211, 184, 0.5) 72%, rgba(205, 177, 142, 0.55) 100%);
+}
+
+.travel-pixel-shell.scene-forest::before {
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 20px, rgba(56, 111, 74, 0.34) 20px 38px, transparent 38px 58px),
+    linear-gradient(135deg, transparent 0 42%, rgba(74, 128, 82, 0.28) 42% 52%, transparent 52%),
+    linear-gradient(90deg, transparent 0 12%, rgba(126, 91, 54, 0.2) 12% 16%, transparent 16% 72%, rgba(126, 91, 54, 0.18) 72% 76%, transparent 76%),
+    linear-gradient(180deg, transparent 0%, rgba(216, 232, 190, 0.5) 72%, rgba(186, 207, 151, 0.56) 100%);
+}
+
+.travel-pixel-shell.scene-waterfront::before {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(47, 111, 151, 0.24) 0 30px, rgba(255, 255, 255, 0.28) 30px 46px, transparent 46px 72px),
+    linear-gradient(90deg, transparent 0 10%, rgba(73, 87, 92, 0.24) 10% 14%, transparent 14% 72%, rgba(73, 87, 92, 0.22) 72% 76%, transparent 76%),
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(59, 128, 164, 0.24) 34px 58px, transparent 58px 92px),
+    linear-gradient(180deg, transparent 0%, rgba(195, 226, 229, 0.52) 70%, rgba(151, 203, 212, 0.58) 100%);
+}
+
+.travel-pixel-shell.scene-mountain::before {
+  background-image:
+    linear-gradient(135deg, transparent 0 38%, rgba(92, 112, 128, 0.32) 38% 52%, transparent 52%),
+    linear-gradient(45deg, transparent 0 46%, rgba(140, 156, 168, 0.28) 46% 60%, transparent 60%),
+    linear-gradient(90deg, transparent 0 12%, rgba(92, 112, 128, 0.18) 12% 18%, transparent 18% 80%),
+    linear-gradient(180deg, transparent 0%, rgba(216, 225, 224, 0.52) 72%, rgba(186, 199, 195, 0.58) 100%);
+}
+
+.travel-pixel-shell.scene-aurora::before,
+.travel-pixel-shell.scene-sleepy::before {
+  opacity: 0.62;
+  background-image:
+    linear-gradient(115deg, transparent 0 32%, rgba(99, 202, 157, 0.34) 32% 42%, transparent 42% 60%, rgba(118, 136, 218, 0.26) 60% 68%, transparent 68%),
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(35, 45, 66, 0.24) 34px 58px, transparent 58px 94px),
+    linear-gradient(90deg, transparent 0 15%, rgba(248, 211, 139, 0.28) 15% 28%, transparent 28%),
+    linear-gradient(180deg, transparent 0%, rgba(53, 66, 91, 0.44) 62%, rgba(207, 217, 220, 0.56) 100%);
+}
+
+.travel-pixel-shell.location-kyoto::after,
+.companion-scene-frame.location-kyoto::after {
+  background-image:
+    linear-gradient(135deg, transparent 0 43%, rgba(156, 72, 58, 0.3) 43% 54%, transparent 54%),
+    radial-gradient(circle at 38% 42%, rgba(232, 124, 143, 0.32) 0 6px, transparent 7px),
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(101, 71, 52, 0.2) 22px 34px, transparent 34px 58px);
+}
+
+.travel-pixel-shell.location-osaka::after,
+.companion-scene-frame.location-osaka::after {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(48, 58, 92, 0.26) 0 20px, transparent 20px 34px, rgba(226, 86, 78, 0.22) 34px 52px),
+    radial-gradient(circle at 48% 40%, rgba(255, 211, 89, 0.34) 0 10px, transparent 11px),
+    repeating-linear-gradient(90deg, transparent 0 26px, rgba(52, 105, 139, 0.2) 26px 52px, transparent 52px 86px);
+}
+
+.travel-pixel-shell.location-nara::after,
+.companion-scene-frame.location-nara::after {
+  background-image:
+    radial-gradient(circle at 38% 42%, rgba(139, 96, 63, 0.28) 0 16px, transparent 17px),
+    linear-gradient(135deg, transparent 0 46%, rgba(70, 118, 82, 0.24) 46% 56%, transparent 56%),
+    repeating-linear-gradient(90deg, transparent 0 28px, rgba(79, 125, 89, 0.2) 28px 44px, transparent 44px 70px);
+}
+
+.travel-pixel-shell.location-reykjavik::after,
+.companion-scene-frame.location-reykjavik::after,
+.travel-pixel-shell.location-tromso::after,
+.companion-scene-frame.location-tromso::after {
+  background-image:
+    linear-gradient(115deg, transparent 0 34%, rgba(93, 210, 165, 0.36) 34% 43%, transparent 43% 62%, rgba(121, 145, 226, 0.26) 62% 70%, transparent 70%),
+    linear-gradient(135deg, transparent 0 44%, rgba(213, 230, 242, 0.22) 44% 55%, transparent 55%),
+    repeating-linear-gradient(90deg, transparent 0 30px, rgba(45, 66, 86, 0.2) 30px 52px, transparent 52px 80px);
+}
+
+.travel-pixel-shell.location-mohe::after,
+.companion-scene-frame.location-mohe::after {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(246, 250, 255, 0.42) 0 18px, transparent 18px 38px),
+    linear-gradient(135deg, transparent 0 42%, rgba(182, 200, 216, 0.26) 42% 54%, transparent 54%),
+    repeating-linear-gradient(90deg, transparent 0 30px, rgba(104, 129, 146, 0.18) 30px 42px, transparent 42px 70px);
+}
+
+.travel-pixel-shell.location-wuhan::after,
+.companion-scene-frame.location-wuhan::after {
+  background-image:
+    radial-gradient(circle at 34% 40%, rgba(238, 127, 153, 0.34) 0 7px, transparent 8px),
+    repeating-linear-gradient(90deg, rgba(63, 132, 164, 0.2) 0 28px, rgba(255, 255, 255, 0.22) 28px 44px, transparent 44px 76px),
+    linear-gradient(180deg, transparent 0 42%, rgba(72, 132, 154, 0.18) 42% 62%, transparent 62%);
+}
+
+.travel-pixel-shell.location-changbai::after,
+.companion-scene-frame.location-changbai::after {
+  background-image:
+    linear-gradient(135deg, transparent 0 36%, rgba(102, 122, 138, 0.32) 36% 50%, transparent 50%),
+    linear-gradient(45deg, transparent 0 44%, rgba(224, 235, 240, 0.34) 44% 56%, transparent 56%),
+    radial-gradient(circle at 48% 58%, rgba(78, 142, 172, 0.2) 0 24px, transparent 25px);
+}
+
+.travel-pixel-shell.location-kanas::after,
+.companion-scene-frame.location-kanas::after {
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 20px, rgba(190, 130, 48, 0.3) 20px 36px, transparent 36px 62px),
+    linear-gradient(135deg, transparent 0 42%, rgba(70, 126, 85, 0.26) 42% 54%, transparent 54%),
+    linear-gradient(180deg, transparent 0 38%, rgba(67, 131, 156, 0.16) 38% 58%, transparent 58%);
+}
+
+.travel-pixel-shell.location-paris::after,
+.companion-scene-frame.location-paris::after {
+  background-image:
+    linear-gradient(90deg, transparent 0 45%, rgba(67, 72, 83, 0.28) 45% 55%, transparent 55%),
+    linear-gradient(135deg, transparent 0 46%, rgba(67, 72, 83, 0.18) 46% 52%, transparent 52%),
+    repeating-linear-gradient(90deg, transparent 0 28px, rgba(206, 162, 92, 0.18) 28px 46px, transparent 46px 76px);
+}
+
+.travel-pixel-shell.location-amsterdam::after,
+.companion-scene-frame.location-amsterdam::after {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(60, 125, 155, 0.24) 0 30px, rgba(255, 255, 255, 0.28) 30px 48px, transparent 48px 76px),
+    linear-gradient(90deg, transparent 0 18%, rgba(103, 70, 45, 0.24) 18% 24%, transparent 24% 68%, rgba(103, 70, 45, 0.2) 68% 74%, transparent 74%),
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(46, 74, 91, 0.18) 22px 34px, transparent 34px 62px);
+}
+
+.travel-pixel-shell.location-brussels::after,
+.companion-scene-frame.location-brussels::after {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(210, 154, 72, 0.26) 0 22px, transparent 22px 38px, rgba(124, 82, 55, 0.2) 38px 58px),
+    radial-gradient(circle at 50% 48%, rgba(105, 70, 47, 0.3) 0 12px, transparent 13px),
+    repeating-linear-gradient(90deg, transparent 0 30px, rgba(196, 145, 74, 0.2) 30px 48px, transparent 48px 84px);
+}
+
+.travel-pixel-shell.scene-heritage::before,
+.travel-pixel-shell.scene-city::before,
+.travel-pixel-shell.scene-cafe::before,
+.travel-pixel-shell.scene-forest::before,
+.travel-pixel-shell.scene-waterfront::before,
+.travel-pixel-shell.scene-mountain::before,
+.travel-pixel-shell.scene-aurora::before,
+.travel-pixel-shell.scene-sleepy::before {
+  opacity: 0.74;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 250, 240, 0.18)),
+    var(--companion-scene-photo);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  filter: saturate(1.25) contrast(1.08);
+}
+
+.travel-pixel-shell.scene-heritage {
+  background:
+    linear-gradient(90deg, rgba(132, 83, 54, 0.05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(132, 83, 54, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, #fff8ed 0%, #eef6fb 45%, #f7ecdc 100%);
+  background-size: 18px 18px, 18px 18px, auto;
+}
+
+.travel-pixel-shell.scene-city {
+  background:
+    linear-gradient(90deg, rgba(54, 86, 118, 0.06) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(54, 86, 118, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, #f5fbff 0%, #eef3f8 48%, #fff7eb 100%);
+  background-size: 18px 18px, 18px 18px, auto;
+}
+
+.travel-pixel-shell.scene-cafe {
+  background:
+    linear-gradient(90deg, rgba(119, 82, 56, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(119, 82, 56, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, #fff6e8 0%, #f8f0e8 50%, #f2fbf7 100%);
+  background-size: 18px 18px, 18px 18px, auto;
+}
+
+.travel-pixel-shell.scene-forest {
+  background:
+    linear-gradient(90deg, rgba(52, 102, 75, 0.06) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(52, 102, 75, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, #f5fbf4 0%, #edf7e6 48%, #fff8e8 100%);
+  background-size: 18px 18px, 18px 18px, auto;
+}
+
+.travel-pixel-shell.scene-waterfront {
+  background:
+    linear-gradient(90deg, rgba(55, 108, 142, 0.06) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(55, 108, 142, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, #f1fbff 0%, #eaf7f4 52%, #fff8e9 100%);
+  background-size: 18px 18px, 18px 18px, auto;
+}
+
+.travel-pixel-shell.scene-mountain,
+.travel-pixel-shell.scene-aurora,
+.travel-pixel-shell.scene-sleepy {
+  background:
+    linear-gradient(90deg, rgba(74, 92, 120, 0.06) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(74, 92, 120, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, #f4f8ff 0%, #eef4f8 50%, #fff8ea 100%);
+  background-size: 18px 18px, 18px 18px, auto;
+}
+
+.travel-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(231, 234, 239, 0.92);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(255, 250, 240, 0.62)),
+    repeating-linear-gradient(90deg, transparent 0 15px, rgba(48, 102, 148, 0.05) 15px 16px);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  padding: 22px;
+  box-shadow: 0 18px 55px rgba(36, 53, 78, 0.08);
+}
+
+.travel-ticket-card {
+  position: relative;
+  border: 1px solid rgba(216, 222, 232, 0.95);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 250, 240, 0.62)),
+    repeating-linear-gradient(0deg, transparent 0 17px, rgba(48, 102, 148, 0.045) 17px 18px);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  box-shadow: 0 14px 42px rgba(36, 53, 78, 0.07);
+}
+
+.travel-ticket-card::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  bottom: 12px;
+  border-left: 2px dotted rgba(48, 102, 148, 0.16);
+  pointer-events: none;
+}
+
+.chat-paper-bg {
+  background:
+    linear-gradient(90deg, rgba(48, 102, 148, 0.045) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(48, 102, 148, 0.045) 1px, transparent 1px),
+    linear-gradient(180deg, #f6f7f8 0%, #f2f5f1 100%);
+  background-size: 20px 20px, 20px 20px, auto;
+}
+
+.companion-scene-frame {
+  transition: background-color 240ms ease, border-color 240ms ease;
+}
+
+.companion-scene-bg {
+  background-color: #f6f7f8;
+  background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
+  background-size: 20px 20px, 20px 20px, 100% 170px, 100% 170px, 100% 100%;
+  background-position: 0 0, 0 0, left bottom, left bottom, center;
+  transition: background 260ms ease;
+}
+
+.companion-scene-bg.scene-heritage {
+  background-image:
+    linear-gradient(90deg, rgba(132, 83, 54, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(132, 83, 54, 0.055) 1px, transparent 1px),
+    linear-gradient(135deg, transparent 0 42%, rgba(153, 76, 54, 0.24) 42% 50%, transparent 50%),
+    repeating-linear-gradient(90deg, rgba(90, 68, 52, 0.18) 0 18px, rgba(255, 255, 255, 0.1) 18px 36px),
+    linear-gradient(180deg, rgba(255, 248, 237, 0.95) 0%, rgba(240, 248, 251, 0.9) 48%, rgba(232, 212, 183, 0.82) 100%);
+}
+
+.companion-scene-bg.scene-city {
+  background-image:
+    linear-gradient(90deg, rgba(54, 86, 118, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(54, 86, 118, 0.055) 1px, transparent 1px),
+    repeating-linear-gradient(90deg, rgba(41, 59, 79, 0.22) 0 18px, transparent 18px 28px, rgba(75, 103, 130, 0.18) 28px 48px),
+    repeating-linear-gradient(90deg, rgba(255, 205, 118, 0.24) 0 6px, transparent 6px 24px),
+    linear-gradient(180deg, rgba(242, 249, 255, 0.96) 0%, rgba(237, 243, 248, 0.92) 52%, rgba(235, 226, 212, 0.86) 100%);
+}
+
+.companion-scene-bg.scene-cafe {
+  background-image:
+    linear-gradient(90deg, rgba(119, 82, 56, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(119, 82, 56, 0.055) 1px, transparent 1px),
+    repeating-linear-gradient(90deg, rgba(126, 78, 48, 0.18) 0 22px, rgba(255, 244, 225, 0.2) 22px 44px),
+    linear-gradient(90deg, transparent 0 13%, rgba(90, 58, 42, 0.22) 13% 18%, transparent 18% 68%, rgba(55, 88, 74, 0.18) 68% 76%, transparent 76%),
+    linear-gradient(180deg, rgba(255, 246, 232, 0.96) 0%, rgba(250, 239, 226, 0.92) 55%, rgba(232, 218, 198, 0.88) 100%);
+}
+
+.companion-scene-bg.scene-forest {
+  background-image:
+    linear-gradient(90deg, rgba(52, 102, 75, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(52, 102, 75, 0.055) 1px, transparent 1px),
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(71, 114, 100, 0.24) 22px 34px, transparent 34px 48px),
+    linear-gradient(135deg, transparent 0 38%, rgba(80, 128, 92, 0.18) 38% 48%, transparent 48%),
+    linear-gradient(180deg, rgba(245, 251, 244, 0.96) 0%, rgba(235, 247, 230, 0.9) 52%, rgba(232, 222, 188, 0.86) 100%);
+}
+
+.companion-scene-bg.scene-waterfront {
+  background-image:
+    linear-gradient(90deg, rgba(55, 108, 142, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(55, 108, 142, 0.055) 1px, transparent 1px),
+    repeating-linear-gradient(90deg, rgba(52, 106, 139, 0.18) 0 28px, rgba(255, 255, 255, 0.24) 28px 42px),
+    linear-gradient(90deg, transparent 0 8%, rgba(77, 92, 96, 0.18) 8% 12%, transparent 12% 72%, rgba(77, 92, 96, 0.18) 72% 76%, transparent 76%),
+    linear-gradient(180deg, rgba(241, 251, 255, 0.96) 0%, rgba(230, 246, 247, 0.9) 54%, rgba(206, 229, 229, 0.88) 100%);
+}
+
+.companion-scene-bg.scene-mountain {
+  background-image:
+    linear-gradient(90deg, rgba(74, 92, 120, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(74, 92, 120, 0.055) 1px, transparent 1px),
+    linear-gradient(135deg, transparent 0 35%, rgba(98, 115, 130, 0.24) 35% 48%, transparent 48%),
+    linear-gradient(45deg, transparent 0 46%, rgba(145, 158, 168, 0.2) 46% 58%, transparent 58%),
+    linear-gradient(180deg, rgba(245, 248, 255, 0.96) 0%, rgba(238, 244, 248, 0.92) 52%, rgba(223, 229, 220, 0.88) 100%);
+}
+
+.companion-scene-bg.scene-aurora {
+  background-image:
+    linear-gradient(90deg, rgba(113, 138, 164, 0.045) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(113, 138, 164, 0.045) 1px, transparent 1px),
+    linear-gradient(115deg, transparent 0 30%, rgba(100, 196, 157, 0.28) 30% 38%, transparent 38% 58%, rgba(118, 136, 218, 0.22) 58% 64%, transparent 64%),
+    linear-gradient(135deg, transparent 0 42%, rgba(219, 231, 245, 0.2) 42% 54%, transparent 54%),
+    linear-gradient(180deg, rgba(25, 35, 58, 0.88) 0%, rgba(50, 65, 90, 0.74) 48%, rgba(232, 239, 236, 0.9) 100%);
+}
+
+.companion-scene-bg.scene-sleepy {
+  background-image:
+    linear-gradient(90deg, rgba(87, 96, 120, 0.045) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(87, 96, 120, 0.045) 1px, transparent 1px),
+    repeating-linear-gradient(90deg, rgba(45, 50, 68, 0.18) 0 30px, transparent 30px 52px),
+    linear-gradient(90deg, transparent 0 15%, rgba(248, 211, 139, 0.24) 15% 28%, transparent 28%),
+    linear-gradient(180deg, rgba(236, 239, 249, 0.96) 0%, rgba(224, 229, 239, 0.94) 56%, rgba(239, 232, 216, 0.9) 100%);
+}
+
+.companion-scene-frame {
+  --companion-scene-photo: none;
+  position: relative;
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.companion-scene-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.72;
+  background-repeat: no-repeat;
+  background-position: left bottom, right bottom, center;
+  background-size: 100% 220px, 100% 220px, 100% 100%;
+}
+
+.companion-scene-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-repeat: no-repeat;
+  background-position: 10% 12%, 88% 26%, 50% 92%;
+  background-size: 150px 110px, 170px 120px, 100% 120px;
+}
+
+.companion-scene-frame > * {
+  position: relative;
+  z-index: 1;
+}
+
+.companion-scene-bg,
+.companion-scene-bg.scene-heritage,
+.companion-scene-bg.scene-city,
+.companion-scene-bg.scene-cafe,
+.companion-scene-bg.scene-forest,
+.companion-scene-bg.scene-waterfront,
+.companion-scene-bg.scene-mountain,
+.companion-scene-bg.scene-aurora,
+.companion-scene-bg.scene-sleepy {
+  background-image:
+    linear-gradient(90deg, rgba(48, 102, 148, 0.038) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(48, 102, 148, 0.038) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(249, 250, 252, 0.72) 0%, rgba(244, 247, 246, 0.7) 100%);
+  background-size: 20px 20px, 20px 20px, auto;
+  background-position: 0 0, 0 0, center;
+  background-repeat: repeat, repeat, no-repeat;
+}
+
+.companion-scene-frame.scene-heritage::before {
+  background-image:
+    linear-gradient(135deg, transparent 0 43%, rgba(157, 86, 63, 0.18) 43% 50%, transparent 50%),
+    repeating-linear-gradient(90deg, transparent 0 24px, rgba(108, 75, 56, 0.12) 24px 40px, transparent 40px 64px),
+    linear-gradient(180deg, rgba(255, 248, 237, 0.9) 0%, rgba(238, 247, 251, 0.7) 52%, rgba(236, 221, 200, 0.75) 100%);
+}
+
+.companion-scene-frame.scene-city::before {
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(48, 65, 84, 0.13) 22px 42px, transparent 42px 58px),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(255, 202, 116, 0.16) 18px 24px, transparent 24px 48px),
+    linear-gradient(180deg, rgba(244, 250, 255, 0.92) 0%, rgba(238, 244, 248, 0.72) 52%, rgba(232, 226, 216, 0.78) 100%);
+}
+
+.companion-scene-frame.scene-cafe::before {
+  background-image:
+    linear-gradient(90deg, transparent 0 10%, rgba(101, 67, 46, 0.13) 10% 16%, transparent 16% 66%, rgba(55, 88, 74, 0.11) 66% 75%, transparent 75%),
+    repeating-linear-gradient(90deg, transparent 0 38px, rgba(144, 93, 58, 0.1) 38px 62px, transparent 62px 92px),
+    linear-gradient(180deg, rgba(255, 246, 232, 0.94) 0%, rgba(250, 240, 229, 0.72) 55%, rgba(235, 222, 205, 0.76) 100%);
+}
+
+.companion-scene-frame.scene-forest::before {
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 24px, rgba(70, 117, 84, 0.13) 24px 38px, transparent 38px 58px),
+    linear-gradient(135deg, transparent 0 40%, rgba(91, 138, 95, 0.12) 40% 50%, transparent 50%),
+    linear-gradient(180deg, rgba(245, 251, 244, 0.94) 0%, rgba(235, 247, 230, 0.72) 52%, rgba(233, 224, 192, 0.76) 100%);
+}
+
+.companion-scene-frame.scene-waterfront::before {
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 24px, rgba(52, 106, 139, 0.12) 24px 46px, transparent 46px 70px),
+    linear-gradient(90deg, transparent 0 10%, rgba(77, 92, 96, 0.11) 10% 14%, transparent 14% 72%, rgba(77, 92, 96, 0.1) 72% 76%, transparent 76%),
+    linear-gradient(180deg, rgba(241, 251, 255, 0.94) 0%, rgba(230, 246, 247, 0.72) 54%, rgba(207, 229, 229, 0.78) 100%);
+}
+
+.companion-scene-frame.scene-mountain::before {
+  background-image:
+    linear-gradient(135deg, transparent 0 35%, rgba(98, 115, 130, 0.16) 35% 48%, transparent 48%),
+    linear-gradient(45deg, transparent 0 46%, rgba(145, 158, 168, 0.13) 46% 58%, transparent 58%),
+    linear-gradient(180deg, rgba(245, 248, 255, 0.94) 0%, rgba(238, 244, 248, 0.72) 52%, rgba(224, 230, 222, 0.76) 100%);
+}
+
+.companion-scene-frame.scene-aurora::before {
+  opacity: 0.64;
+  background-image:
+    linear-gradient(115deg, transparent 0 30%, rgba(100, 196, 157, 0.2) 30% 38%, transparent 38% 58%, rgba(118, 136, 218, 0.15) 58% 64%, transparent 64%),
+    linear-gradient(135deg, transparent 0 42%, rgba(219, 231, 245, 0.14) 42% 54%, transparent 54%),
+    linear-gradient(180deg, rgba(42, 52, 76, 0.72) 0%, rgba(73, 88, 114, 0.48) 48%, rgba(232, 239, 236, 0.76) 100%);
+}
+
+.companion-scene-frame.scene-sleepy::before {
+  opacity: 0.64;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 36px, rgba(45, 50, 68, 0.12) 36px 58px, transparent 58px 90px),
+    linear-gradient(90deg, transparent 0 15%, rgba(248, 211, 139, 0.16) 15% 28%, transparent 28%),
+    linear-gradient(180deg, rgba(236, 239, 249, 0.94) 0%, rgba(224, 229, 239, 0.76) 56%, rgba(239, 232, 216, 0.78) 100%);
+}
+
+.companion-scene-frame.scene-heritage::before,
+.companion-scene-frame.scene-city::before,
+.companion-scene-frame.scene-cafe::before,
+.companion-scene-frame.scene-forest::before,
+.companion-scene-frame.scene-waterfront::before,
+.companion-scene-frame.scene-mountain::before,
+.companion-scene-frame.scene-aurora::before,
+.companion-scene-frame.scene-sleepy::before {
+  opacity: 0.58;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 250, 240, 0.28)),
+    var(--companion-scene-photo);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  filter: saturate(1.2) contrast(1.08);
+}
+
+.wechat-bubble {
+  position: relative;
+  max-width: min(82%, 560px);
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 13px;
+  line-height: 1.72;
+  word-break: break-word;
+}
+
+.wechat-bubble-agent {
+  border: 1px solid rgba(222, 226, 233, 0.95);
+  background: #ffffff;
+  color: #1f2933;
+}
+
+.wechat-bubble-agent::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 13px;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid #ffffff;
+  filter: drop-shadow(-1px 0 0 rgba(222, 226, 233, 0.95));
+}
+
+.wechat-bubble-user {
+  background: #95ec69;
+  color: #18210f;
+}
+
+.wechat-bubble-user::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 13px;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 6px solid #95ec69;
 }
 
 .dot-indicator {

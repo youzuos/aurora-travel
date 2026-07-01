@@ -13,6 +13,7 @@ import {
   type CompanionState,
 } from "../lib/companion";
 import { getCompanionBehaviorProfile, pickInterestPromptLine } from "../lib/companionBehavior";
+import { getCompanionScene } from "../lib/companionScene";
 import { getPixelCompanionMotionClass } from "../lib/pixelCompanionMotion";
 import { POST as companionReplyPost } from "../app/api/companion/reply/route";
 import { GET as companionIpHintGet } from "../app/api/companion/ip-hint/route";
@@ -385,6 +386,46 @@ await runCase("pixel companion maps visible states to distinct motion classes", 
   assert.equal(getPixelCompanionMotionClass("excited", true), "pixel-hop");
   assert.equal(getPixelCompanionMotionClass("idle", true), "pixel-idle");
   assert.equal(getPixelCompanionMotionClass("idle", false), "");
+});
+
+await runCase("companion scene background follows city and current action", () => {
+  const kyotoNow = Date.UTC(2026, 5, 29, 6);
+  const parisNow = Date.UTC(2026, 5, 29, 18);
+  const kanasNow = Date.UTC(2026, 5, 29, 9);
+  const reykjavikNow = Date.UTC(2026, 5, 29, 2);
+  const kyotoMorning = getCompanionScene(
+    readyState({ currentLocationId: "kyoto", visualAction: "walking", lastActiveAt: kyotoNow }, kyotoNow),
+    kyotoNow
+  );
+  const parisDinner = getCompanionScene(
+    readyState({ currentLocationId: "paris", visualAction: "food", lastActiveAt: parisNow }, parisNow),
+    parisNow
+  );
+  const kanasForest = getCompanionScene(
+    readyState({ currentLocationId: "kanas", visualAction: "walking", lastActiveAt: kanasNow }, kanasNow),
+    kanasNow
+  );
+  const reykjavikNight = getCompanionScene(
+    readyState({ currentLocationId: "reykjavik", visualAction: "sleepy", lastActiveAt: reykjavikNow }, reykjavikNow),
+    reykjavikNow
+  );
+
+  assert.equal(kyotoMorning.kind, "heritage");
+  assert.equal(kyotoMorning.sceneClassName, "scene-heritage");
+  assert.equal(kyotoMorning.locationClassName, "location-kyoto");
+  assert.equal(kyotoMorning.className.includes("scene-heritage"), true);
+  assert.equal(kyotoMorning.className.includes("location-kyoto"), true);
+  assert.match(kyotoMorning.photoSrc, /images\.unsplash\.com/);
+  assert.match(kyotoMorning.pixelPhotoSrc, /w=240/);
+  assert.notEqual(kyotoMorning.pixelPhotoSrc, kyotoMorning.photoSrc);
+  assert.equal(parisDinner.kind, "cafe");
+  assert.equal(parisDinner.labelZh, "街角餐厅");
+  assert.equal(kanasForest.kind, "forest");
+  assert.equal(kanasForest.className.includes("scene-forest"), true);
+  assert.equal(kanasForest.className.includes("location-kanas"), true);
+  assert.equal(reykjavikNight.kind, "sleepy");
+  assert.equal(reykjavikNight.className.includes("scene-sleepy"), true);
+  assert.equal(reykjavikNight.className.includes("location-reykjavik"), true);
 });
 
 await runCase("IP hint reads common deployment headers without requiring them", async () => {

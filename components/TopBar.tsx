@@ -31,11 +31,12 @@ export default function TopBar({ lang, onOpenPlanner, onToggleLanguage, onOpenCo
               onClick={onOpenCompanion}
               className="inline-flex items-center gap-1.5 rounded-full border hairline bg-white px-3 py-1.5 text-xs font-medium text-ink-700 transition hover:bg-ink-50"
               title={lang === "zh" ? "打开小动物设置和聊天" : "Open pet companion settings and chat"}
+              aria-label={lang === "zh" ? "打开小动物设置和聊天" : "Open pet companion settings and chat"}
             >
               <span className="text-sm leading-none" aria-hidden="true">
-                🐾
+                ⚙
               </span>
-              <span>{lang === "zh" ? "小动物" : "Pet"}</span>
+              <span>{lang === "zh" ? "小动物设置" : "Pet settings"}</span>
             </button>
             <button
               onClick={onToggleLanguage}

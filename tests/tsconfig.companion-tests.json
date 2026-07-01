@@ -18,6 +18,7 @@
     "../app/api/companion/reply/route.ts",
     "../lib/companion.ts",
     "../lib/companionBehavior.ts",
+    "../lib/companionScene.ts",
     "../lib/pixelCompanionMotion.ts",
     "../lib/companionExploration.ts",
     "../data/companion.ts",

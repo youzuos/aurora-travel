@@ -23,6 +23,14 @@ type CompanionReplyResult = {
 
 type LlmProvider = "gemini" | "azure" | "openai";
 
+const LLM_TIMEOUT_MS = 15000;
+
+function logLlmFallback(reason: string, detail?: unknown) {
+  if (process.env.NODE_ENV !== "development") return;
+  const message = detail instanceof Error ? detail.message : detail;
+  console.warn("[companion-llm] falling back to local:", reason, message ?? "");
+}
+
 function isLang(value: unknown): value is Lang {
   return value === "zh" || value === "en";
 }
@@ -59,6 +67,31 @@ function extractGeminiText(data: any): string | null {
     .trim();
 
   return text || null;
+}
+
+function parseLlmJson(text: string): CompanionReplyResult | null {
+  const trimmed = text.trim();
+  const unfenced = trimmed
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  const candidates = [trimmed, unfenced];
+  const objectStart = unfenced.indexOf("{");
+  const objectEnd = unfenced.lastIndexOf("}");
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    candidates.push(unfenced.slice(objectStart, objectEnd + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as CompanionReplyResult;
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      // Try the next shape.
+    }
+  }
+
+  return null;
 }
 
 function getGeminiConfig() {
@@ -256,15 +289,41 @@ async function callGemini(system: string, user: string, signal: AbortSignal) {
         ],
         generationConfig: {
           responseMimeType: "application/json",
-          maxOutputTokens: 700,
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              messages: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    id: { type: "STRING" },
+                    textZh: { type: "STRING" },
+                    textEn: { type: "STRING" },
+                  },
+                  required: ["id", "textZh", "textEn"],
+                },
+              },
+            },
+            required: ["messages"],
+          },
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+          maxOutputTokens: 1400,
           temperature: 0.75,
         },
       }),
     }
   );
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    logLlmFallback("gemini-http", `${response.status} ${detail.slice(0, 240)}`);
+    return null;
+  }
   const text = extractGeminiText(await response.json());
+  if (!text) logLlmFallback("gemini-empty-response");
   return text ? { provider: "gemini" as const, text } : null;
 }
 
@@ -297,7 +356,7 @@ async function callOpenAI(system: string, user: string, signal: AbortSignal) {
 
 async function callConfiguredLlm(system: string, user: string) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6000);
+  const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
   try {
     return (
@@ -333,10 +392,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ ...fallback, generatedBy: "local" });
     }
 
-    const parsed = JSON.parse(llm.text) as CompanionReplyResult;
+    const parsed = parseLlmJson(llm.text);
+    if (!parsed) {
+      logLlmFallback(`${llm.provider}-json-parse`, llm.text.slice(0, 240));
+      return NextResponse.json({ ...fallback, generatedBy: "local" });
+    }
     const enhanced = applyLlmMessages(fallback.state, fallback.messages, parsed);
     return NextResponse.json({ ...enhanced, generatedBy: llm.provider satisfies LlmProvider });
-  } catch {
+  } catch (error) {
+    logLlmFallback("unexpected-error", error);
     return NextResponse.json({ ...fallback, generatedBy: "local" });
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import CompanionActionShowcase from "@/components/CompanionActionShowcase";
 import CompanionInspirationRadar from "@/components/CompanionInspirationRadar";
 import PixelCompanion from "@/components/PixelSpriteCompanion";
@@ -14,6 +14,7 @@ import {
   type CompanionMessage,
   type CompanionState,
 } from "@/lib/companion";
+import { getCompanionScene } from "@/lib/companionScene";
 import type { WarpStop } from "@/lib/time";
 import type { Lang, WishlistItem } from "@/lib/types";
 
@@ -49,7 +50,7 @@ function timeMoodLabel(timeInfo: ReturnType<typeof getCompanionLocalTimeInfo>, l
   return lang === "zh" ? "醒着闲逛" : "Awake and wandering";
 }
 
-function PhotoCard({ message, lang }: { message: CompanionMessage; lang: Lang }) {
+function PhotoCard({ message, lang, onMediaLoad }: { message: CompanionMessage; lang: Lang; onMediaLoad?: () => void }) {
   const [imageFailed, setImageFailed] = useState(false);
   const caption = lang === "zh" ? message.image?.captionZh : message.image?.captionEn;
   const fallbackLabel = lang === "zh" ? "城市照片暂时不可用。" : "This city photo is unavailable right now.";
@@ -64,6 +65,7 @@ function PhotoCard({ message, lang }: { message: CompanionMessage; lang: Lang })
             src={message.image.src}
             alt={message.image.alt}
             className="h-full w-full object-cover"
+            onLoad={onMediaLoad}
             onError={() => setImageFailed(true)}
           />
         ) : null}
@@ -93,13 +95,30 @@ export default function CompanionChat({
 }: Props) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [showActionPreview, setShowActionPreview] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
   const location = getCurrentLocation(state);
   const messages = useMemo(() => state.messageHistory.slice(-40), [state.messageHistory]);
   const action = getCompanionAction(state);
   const timeInfo = getCompanionLocalTimeInfo(state);
+  const scene = getCompanionScene(state);
+  const sceneStyle = {
+    "--companion-scene-photo": `url("${scene.pixelPhotoSrc}")`,
+  } as CSSProperties;
   const localTime = `${timeInfo.hour.toString().padStart(2, "0")}:00`;
+
+  function scrollToLatest(behavior: ScrollBehavior = "smooth") {
+    window.requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior });
+      bottomRef.current?.scrollIntoView({ block: "end", behavior });
+      window.setTimeout(() => {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior });
+        bottomRef.current?.scrollIntoView({ block: "end", behavior });
+      }, 120);
+    });
+  }
 
   useEffect(() => {
     if (!open || state.unreadCount === 0) return;
@@ -107,8 +126,15 @@ export default function CompanionChat({
   }, [open, onStateChange, state.unreadCount]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length]);
+    if (!open) return;
+    setShowActionPreview(false);
+    scrollToLatest("auto");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    scrollToLatest("smooth");
+  }, [messages.length, open]);
 
   if (!open || !character) return null;
 
@@ -153,13 +179,20 @@ export default function CompanionChat({
       onClick={onClose}
     >
       <div
-        className="flex h-[86vh] w-full flex-col overflow-hidden rounded-t-2xl border hairline bg-white shadow-2xl sm:h-[min(760px,calc(100vh-2rem))] sm:max-w-[420px] sm:rounded-2xl"
+        className={`companion-scene-frame ${scene.className} flex h-[86vh] w-full flex-col overflow-hidden rounded-t-2xl border hairline bg-white shadow-2xl sm:h-[min(760px,calc(100vh-2rem))] sm:max-w-[460px] sm:rounded-2xl`}
+        style={sceneStyle}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="border-b hairline px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="relative h-10 w-10 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowActionPreview((value) => !value)}
+                className="relative h-10 w-10 shrink-0 rounded-lg outline-none ring-0 transition hover:scale-[1.03] focus:ring-2 focus:ring-aurora-200"
+                title={lang === "zh" ? "查看小动物状态" : "Show companion states"}
+                aria-label={lang === "zh" ? "查看小动物状态" : "Show companion states"}
+              >
                 <PixelCompanion
                   character={character}
                   action={action}
@@ -167,7 +200,7 @@ export default function CompanionChat({
                   size="sm"
                   animated
                 />
-              </div>
+              </button>
               <div className="min-w-0">
                 <div className="truncate text-[14px] font-semibold text-ink-900">
                   {lang === "zh" ? character.nameZh : character.nameEn}
@@ -180,17 +213,6 @@ export default function CompanionChat({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onStateChange((currentState) => ({ ...currentState, testMode: !currentState.testMode }))}
-                className="inline-flex items-center gap-1 rounded-full border hairline px-3 py-1.5 text-[11px] text-ink-600 hover:bg-ink-50"
-                title={lang === "zh" ? "切换旅伴测试速度" : "Toggle accelerated companion timing"}
-              >
-                <span className="text-sm leading-none">!</span>
-                <span className="hidden sm:inline">
-                  {state.testMode ? (lang === "zh" ? "测试快" : "Fast") : lang === "zh" ? "正常" : "Normal"}
-                </span>
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -220,10 +242,10 @@ export default function CompanionChat({
               {lang === "zh" ? location.cityZh : location.cityEn} · {localTime} · {timeMoodLabel(timeInfo, lang)}
             </span>
           </div>
-          <CompanionActionShowcase lang={lang} character={character} currentAction={action} />
+          {showActionPreview ? <CompanionActionShowcase lang={lang} character={character} currentAction={action} /> : null}
         </div>
 
-        <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-ink-50/50 px-4 py-4">
+        <div className="border-b hairline bg-[#f8fbf8] px-3 py-3">
           <CompanionInspirationRadar
             lang={lang}
             state={state}
@@ -232,32 +254,46 @@ export default function CompanionChat({
             onStateChange={onStateChange}
             onAddWishlistItems={onAddWishlistItems}
           />
+        </div>
 
-          {messages.map((message) => (
-            <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[82%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${
-                  message.sender === "user" ? "bg-ink-900 text-white" : "border hairline bg-white text-ink-800"
-                }`}
-              >
-                {message.image ? <PhotoCard message={message} lang={lang} /> : null}
+        <div ref={scrollRef} className={`chat-paper-bg companion-scene-bg ${scene.className} flex-1 space-y-3 overflow-y-auto px-4 py-4`}>
 
-                {message.kind === "voice" ? (
-                  <button
-                    type="button"
-                    onClick={() => speak(messageText(message, lang), lang)}
-                    className="mb-1 flex w-full items-center gap-2 rounded-full bg-aurora-50 px-3 py-2 text-left text-[12px] text-aurora-800"
-                  >
-                    <span>&gt;</span>
-                    <span>{message.voiceDurationSec ?? 8}s</span>
-                  </button>
+          {messages.map((message) => {
+            const fromUser = message.sender === "user";
+            return (
+              <div key={message.id} className={`flex items-end gap-2 ${fromUser ? "justify-end" : "justify-start"}`}>
+                {!fromUser ? (
+                  <div className="mb-1 h-8 w-8 shrink-0 overflow-hidden rounded-md bg-white shadow-sm">
+                    <PixelCompanion
+                      character={character}
+                      action={action}
+                      label={lang === "zh" ? character.nameZh : character.nameEn}
+                      size="sm"
+                      animated={false}
+                    />
+                  </div>
                 ) : null}
+                <div className={`wechat-bubble ${fromUser ? "wechat-bubble-user" : "wechat-bubble-agent"}`}>
+                  {message.image ? <PhotoCard message={message} lang={lang} onMediaLoad={() => scrollToLatest("smooth")} /> : null}
 
-                <div>{messageText(message, lang)}</div>
+                  {message.kind === "voice" ? (
+                    <button
+                      type="button"
+                      onClick={() => speak(messageText(message, lang), lang)}
+                      className="mb-1 flex w-full items-center gap-2 rounded-full bg-aurora-50 px-3 py-2 text-left text-[12px] text-aurora-800"
+                    >
+                      <span>&gt;</span>
+                      <span>{message.voiceDurationSec ?? 8}s</span>
+                    </button>
+                  ) : null}
+
+                  <div>{messageText(message, lang)}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
+          <div ref={bottomRef} className="h-1" />
         </div>
 
         <div className="border-t hairline bg-white p-3">

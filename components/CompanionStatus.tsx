@@ -33,7 +33,7 @@ export default function CompanionStatus({ lang, state, onOpen }: Props) {
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-xl border hairline bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(20,30,50,0.04)] transition hover:border-aurora-200 hover:bg-aurora-50/40"
+      className="travel-ticket-card flex w-full items-center gap-3 rounded-xl px-4 py-3 pl-8 text-left transition hover:border-aurora-200 hover:bg-aurora-50/40"
     >
       <div className="relative h-14 w-14 shrink-0">
         <PixelCompanion
