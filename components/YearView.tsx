@@ -8,16 +8,19 @@ import {
   maturityLabel,
   type WarpStop,
 } from "@/lib/time";
-import type { DeferredTrip, Lang, Trip, WishlistItem } from "@/lib/types";
+import type { DeferredTrip, Lang, PlanProfile, Trip, WishlistItem } from "@/lib/types";
 
 interface Props {
   lang: Lang;
   warp: WarpStop;
   trips: Trip[];
   deferredTrips: DeferredTrip[];
+  profile: PlanProfile | null;
   onSelectTrip: (destinationId: string) => void;
   onOpenPlanner: () => void;
   onStartWithWishlist: (items: WishlistItem[]) => void;
+  onLoadDemo?: () => void;
+  onOpenTimeWarp?: () => void;
 }
 
 const INSPIRATIONS = [
@@ -80,14 +83,51 @@ function maturityBand(maturity: string) {
   return "bg-aurora-100 text-aurora-900";
 }
 
+function maturityForTrip(trip: Trip, warp: WarpStop) {
+  return trip.maturityOverride ?? maturityAt(warp, trip.startMonth);
+}
+
+function tripTitle(trip: Trip, lang: Lang) {
+  const dest = DESTINATIONS.find((d) => d.id === trip.destinationId);
+  if (trip.title) return trip.title;
+  if (!dest) return lang === "zh" ? "未知行程" : "Unknown trip";
+  return lang === "zh" ? dest.experience : dest.experienceEn;
+}
+
+function blockedLeftPct(date: string) {
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+  return (((month - 1) * 30.4 + day) / 365) * 100;
+}
+
+function yearSummary(profile: PlanProfile | null, trips: Trip[], deferredTrips: DeferredTrip[]) {
+  const ptoUsed = trips.reduce((sum, trip) => sum + trip.ptoDays, 0);
+  const budgetUsed = trips.reduce((sum, trip) => sum + trip.estimatedBudget, 0);
+  const wishesTotal = trips.length + deferredTrips.length || profile?.wishlistItems?.length || 0;
+  return {
+    ptoUsed,
+    ptoTotal: profile?.ptoDays ?? 0,
+    budgetUsed,
+    budgetTotal: profile?.annualBudget ?? 0,
+    wishesCovered: trips.length,
+    wishesTotal,
+    tripsPlanned: trips.length,
+    tripsTarget: profile?.tripCount ?? trips.length,
+    ptoRemaining: Math.max(0, (profile?.ptoDays ?? 0) - ptoUsed),
+  };
+}
+
 export default function YearView({
   lang,
   warp,
   trips,
   deferredTrips,
+  profile,
   onSelectTrip,
   onOpenPlanner,
   onStartWithWishlist,
+  onLoadDemo,
+  onOpenTimeWarp,
 }: Props) {
   if (!trips.length) {
     return (
@@ -153,31 +193,61 @@ export default function YearView({
           >
             {lang === "zh" ? "+ 用这个开始我的 2026" : "+ Start my 2026 with these"}
           </button>
+
+          {onLoadDemo && (
+            <button
+              onClick={onLoadDemo}
+              className="ml-2 mt-6 rounded-full bg-ink-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-aurora-700"
+            >
+              {lang === "zh" ? "载入小明 Demo" : "Load Xiaoming demo"}
+            </button>
+          )}
         </div>
       </section>
     );
   }
 
+  const summary = yearSummary(profile, trips, deferredTrips);
+
   return (
     <section className="rounded-2xl border hairline bg-white shadow-[0_1px_2px_rgba(20,30,50,0.04)] p-5 sm:p-7">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[11px] uppercase tracking-[0.16em] text-ink-500 font-medium">
             {lang === "zh" ? "年度视图 · 2026" : "Year view · 2026"}
           </div>
           <h2 className="text-[22px] font-semibold tracking-tight text-ink-900 mt-1">
-            {lang === "zh" ? "一份会随时间成长的旅行计划" : "A travel plan that matures over time"}
+            {lang === "zh" ? "你的 2026 旅行计划" : "Your 2026 travel plan"}
           </h2>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-600">
+            <span>{summary.tripsPlanned} {lang === "zh" ? "段已规划" : "planned trips"}</span>
+            <span>·</span>
+            <span>{summary.ptoUsed}/{summary.ptoTotal || "--"} PTO</span>
+            <span>·</span>
+            <span>¥{(summary.budgetUsed / 1000).toFixed(1)}k/¥{summary.budgetTotal ? (summary.budgetTotal / 1000).toFixed(1) : "--"}k</span>
+            <span>·</span>
+            <span>{summary.wishesCovered}/{summary.wishesTotal || "--"} {lang === "zh" ? "心愿" : "wishes"}</span>
+          </div>
         </div>
-        <button
-          onClick={onOpenPlanner}
-          className="self-start rounded-full border hairline bg-white px-3.5 py-2 text-[12px] font-medium text-ink-700 hover:bg-ink-50"
-        >
-          💬 {lang === "zh" ? "Chat to refine" : "Chat to refine"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {onOpenTimeWarp && (
+            <button
+              onClick={onOpenTimeWarp}
+              className="rounded-full border hairline bg-white px-3.5 py-2 text-[12px] font-medium text-ink-700 hover:bg-ink-50"
+            >
+              {lang === "zh" ? "Time Warp 演示" : "Time Warp demo"}
+            </button>
+          )}
+          <button
+            onClick={onOpenPlanner}
+            className="rounded-full border hairline bg-white px-3.5 py-2 text-[12px] font-medium text-ink-700 hover:bg-ink-50"
+          >
+            💬 {lang === "zh" ? "修改计划" : "Refine plan"}
+          </button>
+        </div>
       </div>
 
-      <div className="relative overflow-x-auto pb-1">
+      <div className="mt-6 relative overflow-x-auto pb-1">
         <div className="min-w-[820px]">
           <div className="grid grid-cols-12 text-[10.5px] tracking-[0.12em] text-ink-400 uppercase pb-3">
             {MONTH_LABELS[lang].map((m) => (
@@ -192,13 +262,21 @@ export default function YearView({
                 <div key={i} className={`border-r border-ink-100 ${i === 11 ? "border-r-0" : ""}`} />
               ))}
             </div>
+            {(profile?.unavailableDates ?? []).map((date) => (
+              <div
+                key={date}
+                className="absolute top-1/2 h-5 w-1.5 -translate-y-1/2 rounded-full bg-rose-400"
+                style={{ left: `${blockedLeftPct(date)}%` }}
+                title={date}
+              />
+            ))}
           </div>
 
           <div className="relative mt-7 space-y-4">
             {trips.map((trip) => {
               const dest = DESTINATIONS.find((d) => d.id === trip.destinationId);
               if (!dest) return null;
-              const maturity = maturityAt(warp, trip.startMonth);
+              const maturity = maturityForTrip(trip, warp);
               return (
                 <div key={trip.destinationId} className="relative h-14">
                   <div className="absolute inset-0 grid grid-cols-12">
@@ -219,10 +297,10 @@ export default function YearView({
                     <span className="text-base leading-none">{dest.flag}</span>
                     <div className="min-w-0 text-left">
                       <div className="truncate text-[12.5px] font-semibold leading-tight">
-                        {lang === "zh" ? dest.experience : dest.experienceEn}
+                        {tripTitle(trip, lang)}
                       </div>
                       <div className="mt-0.5 truncate text-[10.5px] opacity-85 leading-tight">
-                        {dest.city} · {trip.days}d · {maturityLabel(maturity, lang)}
+                        {trip.startDate?.slice(5)}-{trip.endDate?.slice(5)} · {trip.days}d · {maturityLabel(maturity, lang)}
                       </div>
                     </div>
                     <span className={`ml-auto h-2.5 w-2.5 rounded-full ${maturityBg(maturity)} ${maturity !== "ready" ? "animate-pulse-soft" : ""}`} />
@@ -265,6 +343,16 @@ export default function YearView({
         <Legend dot="bg-orange-500" label={lang === "zh" ? "Refining · 正在收敛" : "Refining · narrowing"} />
         <Legend dot="bg-emerald-500" label={lang === "zh" ? "Ready · 精准窗口" : "Ready · precise window"} />
         <Legend dot="bg-ink-300" label={lang === "zh" ? "Deferred · 推迟到明年" : "Deferred · next year"} />
+      </div>
+
+      <div className="mt-5 rounded-xl bg-aurora-50/70 px-4 py-3 text-[12.5px] text-aurora-950">
+        {summary.ptoRemaining > 0
+          ? lang === "zh"
+            ? `还有 ${summary.ptoRemaining} 天年假富余，要不要加一个短途或保留给临近调整？`
+            : `${summary.ptoRemaining} PTO day(s) remain. Add a short trip or keep them for later adjustments?`
+          : lang === "zh"
+          ? "今年年假已经比较紧，新增心愿会优先进入候选池或推迟到下一年。"
+          : "PTO is tight this year. New wishes may move to the candidate pool or next year."}
       </div>
     </section>
   );

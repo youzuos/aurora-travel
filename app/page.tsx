@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import TopBar from "@/components/TopBar";
 import TimeWarp from "@/components/TimeWarp";
-import Stats from "@/components/Stats";
 import YearView from "@/components/YearView";
 import TripView from "@/components/TripView";
 import ChatOverlay from "@/components/ChatOverlay";
@@ -14,6 +13,7 @@ import CompanionOnboarding from "@/components/CompanionOnboarding";
 import CompanionStatus from "@/components/CompanionStatus";
 import PriceAlert from "@/components/PriceAlert";
 import MaturitySummary from "@/components/MaturitySummary";
+import { XIAOMING_DEMO_PLAN } from "@/data/demoScenarios";
 import type {
   AgentFinding,
   DeferredTrip,
@@ -42,6 +42,7 @@ export default function Home() {
   const [warp, setWarp] = useState<WarpStop>("year-start");
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
   const [plannerOpen, setPlannerOpen] = useState(false);
+  const [timeWarpOpen, setTimeWarpOpen] = useState(false);
   const [companionState, setCompanionState] = useState<CompanionState>(() => createDefaultCompanionState());
   const [companionStateReady, setCompanionStateReady] = useState(false);
   const [companionChatOpen, setCompanionChatOpen] = useState(false);
@@ -137,6 +138,7 @@ export default function Home() {
     setDeferredTrips(plan.deferredTrips);
     setFindings(plan.findings);
     setSelectedTrip(null);
+    setTimeWarpOpen(false);
     setWarp("year-start");
     setPlannerSeed([]);
     window.localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
@@ -159,6 +161,7 @@ export default function Home() {
     setDeferredTrips([]);
     setFindings([]);
     setSelectedTrip(null);
+    setTimeWarpOpen(false);
     setWarp("year-start");
     window.localStorage.removeItem(PLAN_KEY);
   }
@@ -225,9 +228,12 @@ export default function Home() {
             warp={warp}
             trips={trips}
             deferredTrips={deferredTrips}
+            profile={profile}
             onSelectTrip={setSelectedTrip}
             onOpenPlanner={() => openPlanner()}
             onStartWithWishlist={openPlanner}
+            onLoadDemo={() => applyPlan(XIAOMING_DEMO_PLAN)}
+            onOpenTimeWarp={() => setTimeWarpOpen(true)}
           />
         )}
 
@@ -238,14 +244,32 @@ export default function Home() {
               warp={warp}
               trips={trips}
               deferredTrips={deferredTrips}
+              profile={profile}
               onSelectTrip={setSelectedTrip}
               onOpenPlanner={() => openPlanner()}
               onStartWithWishlist={openPlanner}
+              onOpenTimeWarp={() => setTimeWarpOpen(true)}
             />
-            <TimeWarp lang={lang} warp={warp} onChange={setWarp} />
-            <MaturitySummary lang={lang} warp={warp} trips={trips} />
-            <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
-            <Stats lang={lang} profile={profile} trips={trips} deferredTrips={deferredTrips} />
+            <section className="rounded-2xl border hairline bg-white p-5 shadow-[0_1px_2px_rgba(20,30,50,0.04)]">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-ink-500">
+                    {lang === "zh" ? "Aurora 在持续帮你盯着" : "Aurora keeps watching"}
+                  </div>
+                  <p className="mt-1 text-[13px] text-ink-600">
+                    {lang === "zh"
+                      ? "行程会随着时间继续收敛；需要演示计划如何长大时，再打开 Time Warp。"
+                      : "Plans keep narrowing over time. Open Time Warp when you want to demo that progression."}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setTimeWarpOpen(true)}
+                  className="rounded-full bg-ink-900 px-4 py-2 text-[12px] font-medium text-white hover:bg-aurora-700"
+                >
+                  {lang === "zh" ? "开始 Time Warp 演示" : "Start Time Warp demo"}
+                </button>
+              </div>
+            </section>
           </>
         )}
 
@@ -305,6 +329,35 @@ export default function Home() {
         }}
         onPlanGenerated={applyPlan}
       />
+
+      {timeWarpOpen && hasPlan && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" onClick={() => setTimeWarpOpen(false)}>
+          <div className="absolute inset-0 bg-ink-900/35 backdrop-blur-sm" />
+          <div
+            className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border hairline bg-white p-5 shadow-2xl sm:p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-aurora-700">
+                  Time Warp
+                </div>
+                <h2 className="mt-1 text-[22px] font-semibold text-ink-900">
+                  {lang === "zh" ? "看你的计划如何长大" : "Watch your plan mature"}
+                </h2>
+              </div>
+              <button onClick={() => setTimeWarpOpen(false)} className="text-xl leading-none text-ink-400 hover:text-ink-900">
+                ×
+              </button>
+            </div>
+            <div className="space-y-4">
+              <TimeWarp lang={lang} warp={warp} onChange={setWarp} />
+              <MaturitySummary lang={lang} warp={warp} trips={trips} />
+              <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

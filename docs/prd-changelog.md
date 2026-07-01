@@ -2,6 +2,39 @@
 
 This file records product design and architecture changes that affect the PRD. Keep entries concise and reversible through Git.
 
+## 2026-07-01 - v3 demo flow planning surfaces
+
+Context:
+- The v3 user flow now emphasizes a complete demo path: annual plan hero, optional Time Warp demo, Agent generation visualization, and trip-level day planning.
+- Companion-owned exploration and floating companion code remain outside this change.
+
+Product changes:
+- Added a seeded Xiaoming demo plan for the planning surfaces, including Kyoto + Osaka, Iceland, deferred Xinjiang, daily itinerary, trip wishlist, blocked dates, and reminders.
+- Reworked Year View into the annual plan homepage: summary row, Gantt-first layout, blocked-date markers, deferred trip display, and a compact Time Warp entry.
+- Moved Time Warp out of the default homepage flow and into a modal demo surface.
+- Added Agent generation visualization inside the planner while a plan is being generated.
+- Extended Trip View with day-by-day itinerary, trip wishlist, and reminder detail while keeping leave strategy as the execution section.
+
+Rollback notes:
+- Revert this changelog entry plus the matching updates to `data/demoScenarios.ts`, `lib/types.ts`, `app/page.tsx`, `components/YearView.tsx`, `components/ChatOverlay.tsx`, and `components/TripView.tsx`.
+
+## 2026-06-30 - Trip View decision-first refinement
+
+Context:
+- The Trip View refinement page exposed several equal-weight charts and metrics before explaining what the user should decide.
+- The v3.0 flow defines trip refinement as a decision surface: whether the trip is reliable, when to go, and how to request leave.
+
+Product changes:
+- Reframed Trip View from a data dashboard into a decision explanation page.
+- Added a full-width Aurora judgment hero that summarizes the recommended window in plain language.
+- Replaced the abstract peak curve with a 7-9 day window bar chart and a clearly labeled peak day.
+- Added a miss-risk card with plain-language risk levels and thresholds.
+- Moved price, leave feasibility, and maturity information into secondary rows; the historical price curve is now optional detail.
+- Kept the leave strategy calendar module as the main execution planning section below the decision summary.
+
+Rollback notes:
+- Revert this changelog entry and the matching `components/TripView.tsx` update to return to the prior metric-dashboard Trip View.
+
 ## 2026-06-30 - v3.0 PRD and flow documentation
 
 Context:

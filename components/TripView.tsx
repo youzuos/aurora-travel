@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { getDestination } from "@/data/destinations";
 import { buildMonthCalendar, generateLeaveStrategies, type LeaveStrategy } from "@/lib/calendar";
 import {
@@ -10,7 +10,7 @@ import {
   maturityLabel,
   type WarpStop,
 } from "@/lib/time";
-import type { Destination, Lang, Maturity, PlanProfile, Trip } from "@/lib/types";
+import type { DailyPlanDay, Destination, Lang, Maturity, PlanProfile, Trip, TripWishlistItem } from "@/lib/types";
 
 interface Props {
   lang: Lang;
@@ -22,63 +22,168 @@ interface Props {
   onOpenPlanner: () => void;
 }
 
-function PeakChart({ dest, maturity, lang }: { dest: Destination; maturity: Maturity; lang: Lang }) {
-  const W = 560;
-  const H = 130;
-  const pad = { l: 14, r: 14, t: 14, b: 22 };
+type RiskLevel = "low" | "medium" | "high";
+
+function formatShortDate(date: string) {
+  return date.slice(5).replace("-", "/");
+}
+
+function formatDateRange(start?: string, end?: string, lang: Lang = "zh") {
+  if (!start || !end) return lang === "zh" ? "日期待确认" : "Dates pending";
+  return `${formatShortDate(start)} - ${formatShortDate(end)}`;
+}
+
+function formatDays(days: number, lang: Lang) {
+  return lang === "zh" ? `${days} 天` : `${days}d`;
+}
+
+function formatPto(days: number, lang: Lang) {
+  return lang === "zh" ? `${days} 天年假` : `${days}d PTO`;
+}
+
+function cleanReason(reason: string) {
+  return reason.replace(/\s+的/g, "的").replace(/\s+/g, " ").trim();
+}
+
+function getRangeDays(dest: Destination, maturity: Maturity) {
+  if (maturity === "ready") return dest.confirmedRangeDays;
+  if (maturity === "refining") return dest.refinedRangeDays;
+  return dest.remoteRangeDays;
+}
+
+function getWindowPoints(dest: Destination) {
   const pts = dest.peakCurve;
-  const innerW = W - pad.l - pad.r;
-  const innerH = H - pad.t - pad.b;
-  const stepX = innerW / (pts.length - 1);
-  const peakIdx = pts.reduce((best, p, i) => (p.p > pts[best].p ? i : best), 0);
-  const rangeDays =
-    maturity === "ready"
-      ? dest.confirmedRangeDays
-      : maturity === "refining"
-      ? dest.refinedRangeDays
-      : dest.remoteRangeDays;
-  const half = Math.floor(rangeDays / 2);
-  const lo = Math.max(0, peakIdx - half);
-  const hi = Math.min(pts.length - 1, peakIdx + half);
-  const path = pts
-    .map((p, i) => {
-      const x = pad.l + i * stepX;
-      const y = pad.t + innerH * (1 - p.p);
-      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(" ");
-  const area = `${path} L ${pad.l + (pts.length - 1) * stepX} ${pad.t + innerH} L ${pad.l} ${pad.t + innerH} Z`;
+  const peakIdx = pts.reduce((best, point, index) => (point.p > pts[best].p ? index : best), 0);
+  const desired = 9;
+  let start = Math.max(0, peakIdx - Math.floor(desired / 2));
+  let end = Math.min(pts.length, start + desired);
+  start = Math.max(0, end - desired);
+  return {
+    points: pts.slice(start, end),
+    peakDate: pts[peakIdx]?.date ?? pts[0]?.date,
+  };
+}
+
+function getRiskLevel(missRate: number): RiskLevel {
+  const percent = missRate * 100;
+  if (percent <= 15) return "low";
+  if (percent <= 35) return "medium";
+  return "high";
+}
+
+function getRiskCopy(level: RiskLevel, lang: Lang) {
+  if (lang === "en") {
+    return {
+      label: level === "low" ? "Low" : level === "medium" ? "Medium" : "High",
+      text:
+        level === "low"
+          ? "The window is fairly stable. Focus on execution details."
+          : level === "medium"
+          ? "Worth planning, but Aurora should keep watching weather and timing signals."
+          : "Do not lock every detail yet. Keep a backup window ready.",
+    };
+  }
+
+  return {
+    label: level === "low" ? "较低" : level === "medium" ? "中等" : "较高",
+    text:
+      level === "low"
+        ? "窗口已经比较稳，重点是确认预约、交通和行李。"
+        : level === "medium"
+        ? "值得规划，但还要继续盯天气、花期或雪况变化。"
+        : "不建议现在把日期完全拍死，最好保留备选窗口。",
+  };
+}
+
+function getMaturityHint(maturity: Maturity, lang: Lang) {
+  if (lang === "en") {
+    if (maturity === "sketched") return "This is still an early sketch. Aurora will narrow the window as better signals arrive.";
+    if (maturity === "refining") return "The window is narrowing. Aurora will keep checking weather, openings, and price signals.";
+    return "This is close to execution. The next focus is weather, reservations, transport, and packing.";
+  }
+
+  if (maturity === "sketched") return "现在距离出发还远，这只是初步判断。我会在信息变多后继续收窄窗口。";
+  if (maturity === "refining") return "现在窗口已经开始收敛，后续会继续跟踪天气、开放和价格信号。";
+  return "现在已经接近可执行窗口，重点是确认天气、预约、交通和打包。";
+}
+
+function getAuroraJudgment(dest: Destination, trip: Trip, maturity: Maturity, lang: Lang) {
+  const range = formatDateRange(trip.startDate, trip.endDate, lang);
+  if (lang === "en") {
+    return `I would keep ${dest.experienceEn} around ${range}. ${cleanReason(trip.reasonEn)} ${getMaturityHint(maturity, lang)}`;
+  }
+  return `我建议把「${dest.experience}」放在 ${range}。${cleanReason(trip.reason)} ${getMaturityHint(maturity, lang)}`;
+}
+
+function getTripDisplayTitle(dest: Destination, trip: Trip, lang: Lang) {
+  if (trip.title) return trip.title;
+  return lang === "zh" ? dest.experience : dest.experienceEn;
+}
+
+function fallbackDailyPlan(dest: Destination, trip: Trip): DailyPlanDay[] {
+  const start = trip.startDate ?? "2026-04-01";
+  const baseCity = dest.city;
+  return [
+    {
+      day: 1,
+      date: start,
+      dayOfWeek: "Day 1",
+      city: baseCity,
+      spots: [`抵达 ${baseCity}`, `${dest.experience} 核心体验`, "自由探索时间"],
+      weather: "临近 T-14 后更新天气",
+      notes: ["当前先保留天粒度骨架，后续由天气、开放时间和小精灵见闻继续细化。"],
+      backup: "如果目的地内容不够满，保留为随缘逛逛或继续增加附近目的地。",
+    },
+  ];
+}
+
+function fallbackTripWishlist(dest: Destination): TripWishlistItem[] {
+  return [
+    { name: langlessExperience(dest), added: "system", day: 1 },
+    { name: "自由探索时间", added: "system", note: "目的地较少时，先留白给临场体验。" },
+  ];
+}
+
+function langlessExperience(dest: Destination) {
+  return dest.experience.replace(/^.+? /, dest.experience);
+}
+
+function WindowBarChart({ dest, lang }: { dest: Destination; lang: Lang }) {
+  const { points, peakDate } = useMemo(() => getWindowPoints(dest), [dest]);
+  const maxP = Math.max(...points.map((point) => point.p), 1);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[130px]">
-      <defs>
-        <linearGradient id="peakFill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#427fb0" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#427fb0" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <rect
-        x={pad.l + lo * stepX}
-        y={pad.t}
-        width={(hi - lo) * stepX}
-        height={innerH}
-        fill={maturity === "ready" ? "rgba(34,197,94,0.10)" : "rgba(66,127,176,0.12)"}
-        rx="6"
-      />
-      <path d={area} fill="url(#peakFill)" />
-      <path d={path} fill="none" stroke="#306694" strokeWidth="1.6" />
-      <line x1={pad.l + peakIdx * stepX} x2={pad.l + peakIdx * stepX} y1={pad.t} y2={pad.t + innerH} stroke="#306694" strokeWidth="1" strokeDasharray="2 3" opacity="0.55" />
-      <circle cx={pad.l + peakIdx * stepX} cy={pad.t + innerH * (1 - pts[peakIdx].p)} r="3" fill="#306694" />
-      <text x={pad.l + lo * stepX} y={H - 6} fontSize="9.5" fill="#737c8e">
-        {pts[lo].date.slice(5)}
-      </text>
-      <text x={pad.l + peakIdx * stepX} y={H - 6} fontSize="9.5" fill="#306694" fontWeight="600" textAnchor="middle">
-        {lang === "zh" ? "峰值" : "peak"} {pts[peakIdx].date.slice(5)}
-      </text>
-      <text x={pad.l + hi * stepX} y={H - 6} fontSize="9.5" fill="#737c8e" textAnchor="end">
-        {pts[hi].date.slice(5)}
-      </text>
-    </svg>
+    <div className="h-[220px] rounded-xl bg-white px-4 pb-4 pt-5">
+      <div className="flex h-[160px] items-end justify-between gap-2">
+        {points.map((point) => {
+          const isPeak = point.date === peakDate;
+          const height = Math.max(20, Math.round((point.p / maxP) * 148));
+          return (
+            <div key={point.date} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2">
+              {isPeak && (
+                <div className="rounded-full bg-aurora-700 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  {lang === "zh" ? "峰值" : "Peak"}
+                </div>
+              )}
+              <div
+                className={`w-full max-w-[34px] rounded-t-md transition-all duration-300 ${
+                  isPeak ? "bg-aurora-800 shadow-sm" : "bg-aurora-300"
+                }`}
+                style={{ height }}
+                title={`${point.date}: ${Math.round(point.p * 100)}%`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex justify-between gap-2 text-center text-[10.5px] text-ink-500">
+        {points.map((point) => (
+          <div key={point.date} className="min-w-0 flex-1">
+            {formatShortDate(point.date)}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -91,7 +196,7 @@ function PriceChart({ dest, warp }: { dest: Destination; warp: WarpStop }) {
   const innerH = H - pad.t - pad.b;
   const max = Math.max(...pts.map((p) => p.price));
   const min = Math.min(...pts.map((p) => p.price));
-  const stepX = innerW / (pts.length - 1);
+  const stepX = innerW / Math.max(1, pts.length - 1);
   const path = pts
     .map((p, i) => {
       const x = pad.l + i * stepX;
@@ -105,24 +210,25 @@ function PriceChart({ dest, warp }: { dest: Destination; warp: WarpStop }) {
     "t-30": 30,
     "t-14": 14,
   };
-  const cursor = Math.max(0, pts.findIndex((p) => p.t <= tNow[warp]));
+  const rawCursor = pts.findIndex((p) => p.t <= tNow[warp]);
+  const cursor = rawCursor >= 0 ? rawCursor : pts.length - 1;
   const cursorX = pad.l + cursor * stepX;
-  const cursorPrice = pts[cursor].price;
-  const troughL = pts.findIndex((p) => p.t <= 60);
-  const troughR = pts.findIndex((p) => p.t <= 45);
+  const cursorPrice = pts[cursor]?.price ?? min;
+  const troughL = Math.max(0, pts.findIndex((p) => p.t <= 60));
+  const troughR = Math.max(troughL, pts.findIndex((p) => p.t <= 45));
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[130px]">
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-[130px] w-full">
       <defs>
-        <linearGradient id="priceFill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#427fb0" stopOpacity="0.25" />
+        <linearGradient id="priceFillTripDetail" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#427fb0" stopOpacity="0.22" />
           <stop offset="100%" stopColor="#427fb0" stopOpacity="0" />
         </linearGradient>
       </defs>
       <text x="4" y={pad.t + 4} fontSize="9.5" fill="#9aa2b3">¥{Math.round(max / 1000)}k</text>
       <text x="4" y={pad.t + innerH} fontSize="9.5" fill="#9aa2b3">¥{Math.round(min / 1000)}k</text>
       <rect x={pad.l + troughL * stepX} y={pad.t} width={(troughR - troughL) * stepX} height={innerH} fill="rgba(34,197,94,0.12)" rx="4" />
-      <path d={`${path} L ${pad.l + (pts.length - 1) * stepX} ${pad.t + innerH} L ${pad.l} ${pad.t + innerH} Z`} fill="url(#priceFill)" />
+      <path d={`${path} L ${pad.l + (pts.length - 1) * stepX} ${pad.t + innerH} L ${pad.l} ${pad.t + innerH} Z`} fill="url(#priceFillTripDetail)" />
       <path d={path} fill="none" stroke="#306694" strokeWidth="1.6" />
       <line x1={cursorX} x2={cursorX} y1={pad.t} y2={pad.t + innerH} stroke="#1c1f26" strokeWidth="1" />
       <circle cx={cursorX} cy={pad.t + 6} r="3.2" fill="#1c1f26" />
@@ -132,6 +238,219 @@ function PriceChart({ dest, warp }: { dest: Destination; warp: WarpStop }) {
       <text x={pad.l} y={H - 6} fontSize="9.5" fill="#737c8e">T-365</text>
       <text x={pad.l + innerW} y={H - 6} fontSize="9.5" fill="#737c8e" textAnchor="end">T-0</text>
     </svg>
+  );
+}
+
+function DecisionHero({
+  dest,
+  trip,
+  maturity,
+  lang,
+}: {
+  dest: Destination;
+  trip: Trip;
+  maturity: Maturity;
+  lang: Lang;
+}) {
+  return (
+    <section className="rounded-2xl bg-gradient-to-br from-aurora-900 via-aurora-800 to-ink-900 px-5 py-5 text-white shadow-sm sm:px-6">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">
+        {lang === "zh" ? "Aurora 的判断" : "Aurora's call"}
+      </div>
+      <p className="mt-3 max-w-4xl text-[20px] font-semibold leading-relaxed sm:text-[24px]">
+        {getAuroraJudgment(dest, trip, maturity, lang)}
+      </p>
+      <div className="mt-5 grid grid-cols-2 gap-3 text-[12px] text-white/78 sm:grid-cols-4">
+        <HeroMetric label={lang === "zh" ? "建议窗口" : "Window"} value={formatDateRange(trip.startDate, trip.endDate, lang)} />
+        <HeroMetric label={lang === "zh" ? "行程天数" : "Trip days"} value={formatDays(trip.days, lang)} />
+        <HeroMetric label={lang === "zh" ? "需要年假" : "PTO needed"} value={formatPto(trip.ptoDays, lang)} />
+        <HeroMetric label={lang === "zh" ? "预计预算" : "Budget"} value={`¥${trip.estimatedBudget.toLocaleString()}`} />
+      </div>
+    </section>
+  );
+}
+
+function HeroMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-white/10 px-3 py-2">
+      <div>{label}</div>
+      <div className="mt-1 text-[14px] font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
+function WindowDecisionSection({
+  dest,
+  trip,
+  maturity,
+  lang,
+}: {
+  dest: Destination;
+  trip: Trip;
+  maturity: Maturity;
+  lang: Lang;
+}) {
+  const missRate = dest.missRate[maturity];
+  const riskLevel = getRiskLevel(missRate);
+  const riskCopy = getRiskCopy(riskLevel, lang);
+  const riskClass =
+    riskLevel === "low"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+      : riskLevel === "medium"
+      ? "border-amber-200 bg-amber-50 text-amber-900"
+      : "border-rose-200 bg-rose-50 text-rose-900";
+
+  return (
+    <section className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="rounded-2xl border hairline bg-ink-50/50 p-4 sm:p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+              {lang === "zh" ? "Aurora 给你的窗口建议" : "Recommended window"}
+            </div>
+            <h3 className="mt-1 text-[18px] font-semibold text-ink-900">
+              {formatDateRange(trip.startDate, trip.endDate, lang)}
+            </h3>
+          </div>
+          <div className="text-[12px] text-ink-500">
+            {lang === "zh" ? "当前可参考宽度" : "Current range"}：{formatDays(getRangeDays(dest, maturity), lang)}
+          </div>
+        </div>
+        <div className="mt-4">
+          <WindowBarChart dest={dest} lang={lang} />
+        </div>
+        <p className="mt-3 text-[12.5px] leading-relaxed text-ink-600">
+          {lang === "zh"
+            ? "每根柱子代表一天，越高说明越接近这次体验的理想窗口。这里先帮你看清楚“哪几天最值得请假”，不是让你读统计图。"
+            : "Each bar is one day. Taller means closer to the ideal timing window, so you can see which days are worth taking PTO for."}
+        </p>
+      </div>
+
+      <aside className={`rounded-2xl border p-5 ${riskClass}`}>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-70">
+          {lang === "zh" ? "扑空风险" : "Miss risk"}
+        </div>
+        <div className="mt-2 flex items-end gap-2">
+          <div className="text-[38px] font-semibold leading-none">{Math.round(missRate * 100)}%</div>
+          <div className="pb-1 text-[14px] font-semibold">{riskCopy.label}</div>
+        </div>
+        <p className="mt-4 text-[13px] leading-relaxed">{riskCopy.text}</p>
+        <div className="mt-5 rounded-lg bg-white/55 px-3 py-2 text-[11.5px] leading-relaxed">
+          {lang === "zh"
+            ? "规则：0-15% 为较低，16-35% 为中等，36% 以上为较高。"
+            : "Rule: 0-15% is low, 16-35% is medium, and 36%+ is high."}
+        </div>
+      </aside>
+    </section>
+  );
+}
+
+function SecondaryInfo({
+  dest,
+  trip,
+  maturity,
+  warp,
+  lang,
+}: {
+  dest: Destination;
+  trip: Trip;
+  maturity: Maturity;
+  warp: WarpStop;
+  lang: Lang;
+}) {
+  return (
+    <section className="mt-5 rounded-2xl border hairline bg-white">
+      <div className="border-b hairline px-5 py-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+          {lang === "zh" ? "其他你需要知道的" : "Other useful signals"}
+        </div>
+      </div>
+      <InfoRow
+        icon="💰"
+        title={lang === "zh" ? "价格提醒" : "Price signal"}
+        text={
+          lang === "zh"
+            ? "按历史价格看，T-60 到 T-45 通常更适合关注机票和酒店；临近窗口我会再提醒。"
+            : "Historically, T-60 to T-45 is the better window to watch flights and hotels."
+        }
+      >
+        <details className="mt-3 rounded-xl bg-ink-50 px-3 py-2">
+          <summary className="cursor-pointer text-[11.5px] font-medium text-aurora-800">
+            {lang === "zh" ? "看历史价格曲线" : "Show historical price curve"}
+          </summary>
+          <div className="mt-2">
+            <PriceChart dest={dest} warp={warp} />
+          </div>
+        </details>
+      </InfoRow>
+      <InfoRow
+        icon="🗓"
+        title={lang === "zh" ? "请假可行性" : "Leave feasibility"}
+        text={
+          lang === "zh"
+            ? `用 ${trip.ptoDays} 天年假换 ${trip.days} 天行程，借力 ${trip.holidayLeveraged} 天公共假期或周末。`
+            : `${trip.ptoDays} PTO days can unlock a ${trip.days}-day trip with ${trip.holidayLeveraged} free days.`
+        }
+      />
+      <InfoRow
+        icon="⌁"
+        title={lang === "zh" ? "计划成熟度" : "Plan maturity"}
+        text={
+          lang === "zh"
+            ? `当前是 ${maturityLabel(maturity, lang)}。同一份计划会从 Sketch 到 Refining 再到 Ready，信息会越来越细。`
+            : `Current state: ${maturityLabel(maturity, lang)}. The same plan matures from Sketch to Refining to Ready.`
+        }
+      />
+      {trip.reminders?.length ? (
+        <InfoRow
+          icon="🔔"
+          title={lang === "zh" ? "提醒安排" : "Reminder schedule"}
+          text={
+            lang === "zh"
+              ? trip.reminders.map((item) => `${item.trigger} ${item.type}`).join(" / ")
+              : trip.reminders.map((item) => `${item.trigger} ${item.type}`).join(" / ")
+          }
+        >
+          <details className="mt-3 rounded-xl bg-ink-50 px-3 py-2">
+            <summary className="cursor-pointer text-[11.5px] font-medium text-aurora-800">
+              {lang === "zh" ? "展开提醒节点" : "Show reminder nodes"}
+            </summary>
+            <div className="mt-2 space-y-2">
+              {trip.reminders.map((reminder) => (
+                <div key={`${reminder.trigger}-${reminder.type}`} className="text-[11.5px] leading-relaxed text-ink-650">
+                  <span className="font-semibold text-ink-900">{reminder.trigger}</span> · {reminder.date} · {reminder.message}
+                </div>
+              ))}
+            </div>
+          </details>
+        </InfoRow>
+      ) : null}
+    </section>
+  );
+}
+
+function InfoRow({
+  icon,
+  title,
+  text,
+  children,
+}: {
+  icon: string;
+  title: string;
+  text: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="border-b hairline px-5 py-4 last:border-b-0">
+      <div className="flex gap-3">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-50 text-[15px]">{icon}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold text-ink-900">{title}</div>
+          <div className="mt-1 text-[12.5px] leading-relaxed text-ink-600">{text}</div>
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -156,16 +475,16 @@ function LeaveStrategyPanel({
   const conflictSet = new Set(active.blockedConflicts);
 
   return (
-    <section className="mt-5 rounded-xl border hairline bg-ink-50/40 p-4">
+    <section className="mt-5 rounded-2xl border hairline bg-ink-50/40 p-4 sm:p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-ink-500 font-medium">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
             {lang === "zh" ? "请假策略" : "Leave strategy"}
           </div>
           <div className="mt-1 text-[13px] text-ink-600">
             {lang === "zh"
-              ? "结合公共节假日、年假和不可出行日期，先给出可比较的候选方案。"
-              : "Compare candidate options using holidays, PTO, and blocked dates."}
+              ? "下面是几种可比较的请假方案，你可以先选最适合沟通和执行的一种。"
+              : "Compare a few PTO options and pick the one that is easiest to execute."}
           </div>
         </div>
         <div className="text-[12px] text-ink-500">
@@ -186,7 +505,7 @@ function LeaveStrategyPanel({
               <div className="text-[13px] font-semibold text-ink-900">
                 {lang === "zh" ? strategy.title : strategy.titleEn}
               </div>
-              <div className="text-[11px] text-aurora-700">{strategy.ptoDays}d PTO</div>
+              <div className="text-[11px] text-aurora-700">{formatPto(strategy.ptoDays, lang)}</div>
             </div>
             <div className="mt-1 text-[11.5px] leading-relaxed text-ink-600">
               {lang === "zh" ? strategy.summary : strategy.summaryEn}
@@ -250,9 +569,9 @@ function LeaveStrategyPanel({
 
         <div className="rounded-xl border hairline bg-white p-4">
           <div className="grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
-            <Metric label={lang === "zh" ? "旅行天数" : "Trip days"} value={`${active.totalDays}d`} />
-            <Metric label={lang === "zh" ? "请年假" : "PTO"} value={`${active.ptoDays}d`} />
-            <Metric label={lang === "zh" ? "节假日/周末" : "Free days"} value={`${active.holidayDates.length}d`} />
+            <Metric label={lang === "zh" ? "旅行天数" : "Trip days"} value={formatDays(active.totalDays, lang)} />
+            <Metric label={lang === "zh" ? "请年假" : "PTO"} value={formatDays(active.ptoDays, lang)} />
+            <Metric label={lang === "zh" ? "节假日/周末" : "Free days"} value={formatDays(active.holidayDates.length, lang)} />
             <Metric label={lang === "zh" ? "冲突" : "Conflicts"} value={`${active.blockedConflicts.length}`} />
           </div>
           <div className="mt-4 flex flex-wrap gap-3 text-[11px] text-ink-500">
@@ -262,10 +581,124 @@ function LeaveStrategyPanel({
           </div>
           <div className="mt-4 text-[11.5px] leading-relaxed text-ink-600">
             {lang === "zh"
-              ? "后续可在这里加入“保存此方案”和真实票价/酒店价格联动。当前先完成可接入的请假策略框架。"
-              : "Later this can save a selected option and connect to flight/hotel pricing. This MVP builds the pluggable strategy frame first."}
+              ? "后续可以把选中的方案保存下来，并接入真实票价、酒店和请假审批提醒。当前先把可比较的请假策略框架搭好。"
+              : "Later, the selected option can be saved and connected to pricing, hotel, and approval reminders."}
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function DailyItinerarySection({
+  lang,
+  dest,
+  trip,
+}: {
+  lang: Lang;
+  dest: Destination;
+  trip: Trip;
+}) {
+  const days = trip.dailyPlan?.length ? trip.dailyPlan : fallbackDailyPlan(dest, trip);
+  const visible = days.slice(0, 5);
+
+  return (
+    <section className="mt-5 rounded-2xl border hairline bg-white p-4 sm:p-5">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            {lang === "zh" ? "天粒度行程" : "Day-by-day plan"}
+          </div>
+          <div className="mt-1 text-[13px] text-ink-600">
+            {lang === "zh"
+              ? "先把每天要解决的问题列出来；临近出发时再继续细化天气、闭馆和备选方案。"
+              : "Start with the daily structure; weather, closures, and backups get sharper near departure."}
+          </div>
+        </div>
+        {days.length > visible.length && (
+          <div className="text-[12px] text-ink-500">
+            {lang === "zh" ? `先展示 ${visible.length}/${days.length} 天` : `Showing ${visible.length}/${days.length} days`}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {visible.map((day) => (
+          <article key={`${day.day}-${day.date}`} className="rounded-xl border hairline bg-ink-50/45 p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-[14px] font-semibold text-ink-900">
+                Day {day.day} · {formatShortDate(day.date)} · {day.dayOfWeek} · {day.city}
+              </div>
+              {day.weather && <div className="text-[11.5px] text-ink-500">⚠️ {day.weather}</div>}
+            </div>
+            <ul className="mt-3 space-y-1.5">
+              {day.spots.map((spot) => (
+                <li key={spot} className="flex gap-2 text-[12.5px] text-ink-750">
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-aurora-500" />
+                  <span>{spot}</span>
+                </li>
+              ))}
+            </ul>
+            {day.notes?.length ? (
+              <div className="mt-3 space-y-1">
+                {day.notes.map((note) => (
+                  <div key={note} className="text-[11.5px] leading-relaxed text-ink-600">
+                    💡 {note}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {day.backup && (
+              <div className="mt-3 rounded-lg bg-white px-3 py-2 text-[11.5px] leading-relaxed text-ink-650">
+                {lang === "zh" ? "备选：" : "Backup: "} {day.backup}
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TripWishlistSection({
+  lang,
+  dest,
+  trip,
+}: {
+  lang: Lang;
+  dest: Destination;
+  trip: Trip;
+}) {
+  const items = trip.tripWishlist?.length ? trip.tripWishlist : fallbackTripWishlist(dest);
+
+  return (
+    <section className="mt-5 rounded-2xl border hairline bg-ink-50/40 p-4 sm:p-5">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+        {lang === "zh" ? "本次行程心愿夹" : "Trip wishlist"}
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+        {items.map((item) => (
+          <div key={`${item.name}-${item.day ?? "todo"}`} className="rounded-xl border hairline bg-white px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[13px] font-semibold text-ink-900">{item.name}</div>
+                <div className="mt-1 text-[11.5px] text-ink-500">
+                  {item.day
+                    ? lang === "zh"
+                      ? `已加入 Day ${item.day}`
+                      : `Added to Day ${item.day}`
+                    : lang === "zh"
+                    ? "待加入"
+                    : "Pending"}
+                </div>
+              </div>
+              <span className="rounded-full bg-aurora-50 px-2 py-1 text-[10.5px] text-aurora-800">
+                {item.added === "companion" ? (lang === "zh" ? "小精灵" : "Companion") : item.added === "user" ? (lang === "zh" ? "用户" : "User") : "Aurora"}
+              </span>
+            </div>
+            {item.note && <div className="mt-2 text-[11.5px] leading-relaxed text-ink-600">“{item.note}”</div>}
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -275,14 +708,14 @@ export default function TripView({ lang, destinationId, warp, trips, profile, on
   const dest = getDestination(destinationId);
   const trip = trips.find((t) => t.destinationId === destinationId);
   if (!dest || !trip) return null;
-  const maturity = maturityAt(warp, trip.startMonth);
-  const missRate = dest.missRate[maturity];
+
+  const maturity = trip.maturityOverride ?? maturityAt(warp, trip.startMonth);
   const leaveStrategies = generateLeaveStrategies(trip, profile);
 
   return (
-    <section className="rounded-2xl border hairline bg-white shadow-[0_1px_2px_rgba(20,30,50,0.04)] overflow-hidden animate-fade-in">
-      <div className="px-5 sm:px-7 py-5 border-b hairline flex items-center justify-between gap-4">
-        <button onClick={onBack} className="text-[12px] text-ink-500 hover:text-ink-900 flex items-center gap-1.5">
+    <section className="animate-fade-in overflow-hidden rounded-2xl border hairline bg-white shadow-[0_1px_2px_rgba(20,30,50,0.04)]">
+      <div className="flex items-center justify-between gap-4 border-b hairline px-5 py-5 sm:px-7">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-[12px] text-ink-500 hover:text-ink-900">
           ← {lang === "zh" ? "返回年度视图" : "Back to year view"}
         </button>
         <div className="flex items-center gap-2">
@@ -291,113 +724,35 @@ export default function TripView({ lang, destinationId, warp, trips, profile, on
         </div>
       </div>
 
-      <div className="px-5 sm:px-7 py-6">
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-ink-500">
-              {lang === "zh" ? "行程精修" : "Trip detail"}
-            </div>
-            <h2 className="text-[26px] font-semibold tracking-tight text-ink-900 mt-1 flex flex-wrap items-center gap-3">
-              <span>{dest.flag}</span>
-              {lang === "zh" ? dest.experience : dest.experienceEn}
-              <span className="text-base font-normal text-ink-500">· {dest.city}, {dest.country}</span>
-            </h2>
-            <div className="text-[12.5px] text-ink-600 mt-1.5 max-w-2xl">
-              {lang === "zh" ? dest.story : dest.storyEn}
-            </div>
+      <div className="px-5 py-6 sm:px-7">
+        <div className="mb-5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+            {lang === "zh" ? "单次旅行精修" : "Trip refinement"}
           </div>
-          <div className="rounded-xl border hairline bg-ink-50 px-4 py-3 text-[12px] text-ink-700 lg:w-[280px]">
-            <div className="font-semibold text-ink-900 mb-1">
-              {lang === "zh" ? "为什么放在这里" : "Why this slot"}
-            </div>
-            {lang === "zh" ? trip.reason : trip.reasonEn}
+          <h2 className="mt-1 flex flex-wrap items-center gap-3 text-[26px] font-semibold tracking-tight text-ink-900">
+            <span>{dest.flag}</span>
+            {getTripDisplayTitle(dest, trip, lang)}
+            <span className="text-base font-normal text-ink-500">· {dest.city}, {dest.country}</span>
+          </h2>
+          <div className="mt-2 flex flex-wrap gap-2 text-[12px] text-ink-600">
+            <span className="rounded-full bg-ink-50 px-3 py-1">{formatDateRange(trip.startDate, trip.endDate, lang)}</span>
+            <span className="rounded-full bg-ink-50 px-3 py-1">{formatDays(trip.days, lang)}</span>
+            <span className="rounded-full bg-ink-50 px-3 py-1">{lang === "zh" ? `需请 ${trip.ptoDays} 天` : `PTO ${trip.ptoDays}d`}</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <Panel
-            title={lang === "zh" ? "体验时钟 · 峰值概率" : "Experience clock · peak probability"}
-            aside={`${lang === "zh" ? "区间宽度" : "Range"} ${
-              maturity === "ready" ? dest.confirmedRangeDays : maturity === "refining" ? dest.refinedRangeDays : dest.remoteRangeDays
-            }d`}
-          >
-            <PeakChart dest={dest} maturity={maturity} lang={lang} />
-            <div className="mt-2 text-[11.5px] text-ink-600 flex items-center justify-between">
-              <span>
-                {maturity === "sketched"
-                  ? lang === "zh"
-                    ? "远期给概率，不假装精确"
-                    : "Far out: probability, not false precision"
-                  : maturity === "refining"
-                  ? lang === "zh"
-                    ? "区间正在收敛"
-                    : "The window is narrowing"
-                  : lang === "zh"
-                  ? "峰值锁定，可执行"
-                  : "Peak locked, ready to execute"}
-              </span>
-              <span className="text-rose-500">
-                {lang === "zh" ? "扑空率" : "Miss risk"} <span className="font-semibold">{(missRate * 100).toFixed(0)}%</span>
-              </span>
-            </div>
-          </Panel>
-
-          <Panel
-            title={lang === "zh" ? "订票时钟 · 历史价格" : "Booking clock · historical price"}
-            aside={lang === "zh" ? "3 年均值 · 预置数据" : "3-year avg · seeded data"}
-          >
-            <PriceChart dest={dest} warp={warp} />
-            <div className="mt-2 text-[11.5px] text-ink-600">
-              {lang === "zh"
-                ? "T-60~45 是历史价格谷底，价格 Agent 会在接近窗口时提醒。"
-                : "T-60~45 is the historical trough. The price agent alerts near that window."}
-            </div>
-          </Panel>
-
-          <Panel title={lang === "zh" ? "假期杠杆" : "Holiday leverage"}>
-            <div className="flex items-baseline justify-between mb-2">
-              <div className="text-[12px] text-ink-700">
-                {trip.ptoDays}d PTO ×{" "}
-                <span className="text-emerald-700 font-semibold">
-                  {(trip.days / Math.max(1, trip.ptoDays)).toFixed(1)}
-                </span>{" "}
-                = {trip.days}d
-              </div>
-              <div className="text-[12px] font-semibold text-ink-900">¥{trip.estimatedBudget.toLocaleString()}</div>
-            </div>
-            <div className="flex h-7 rounded-lg overflow-hidden border hairline">
-              <div className="bg-aurora-600 text-white text-[10.5px] grid place-items-center font-medium" style={{ width: `${(trip.ptoDays / trip.days) * 100}%` }}>
-                PTO · {trip.ptoDays}d
-              </div>
-              <div className="bg-emerald-100 text-emerald-800 text-[10.5px] grid place-items-center font-medium" style={{ width: `${(trip.holidayLeveraged / trip.days) * 100}%` }}>
-                {lang === "zh" ? "公共假期" : "Holiday"} · {trip.holidayLeveraged}d
-              </div>
-            </div>
-          </Panel>
-
-          <Panel title={lang === "zh" ? "成熟度时间线" : "Maturity timeline"}>
-            <div className="flex flex-wrap items-center gap-3">
-              <StagePill label="Sketch" active={maturity === "sketched"} />
-              <span className="text-ink-300">→</span>
-              <StagePill label="Refining" active={maturity === "refining"} />
-              <span className="text-ink-300">→</span>
-              <StagePill label="Ready" active={maturity === "ready"} />
-            </div>
-            <div className="mt-3 text-[11.5px] text-ink-600">
-              {lang === "zh"
-                ? "同一份计划持续成长，不要求用户反复重新选择模式。"
-                : "The same plan matures over time without making the user choose modes repeatedly."}
-            </div>
-          </Panel>
-        </div>
-
+        <DecisionHero dest={dest} trip={trip} maturity={maturity} lang={lang} />
+        <WindowDecisionSection dest={dest} trip={trip} maturity={maturity} lang={lang} />
+        <DailyItinerarySection lang={lang} dest={dest} trip={trip} />
+        <TripWishlistSection lang={lang} dest={dest} trip={trip} />
         <LeaveStrategyPanel lang={lang} trip={trip} strategies={leaveStrategies} />
+        <SecondaryInfo dest={dest} trip={trip} maturity={maturity} warp={warp} lang={lang} />
 
         <button
           onClick={onOpenPlanner}
-          className="mt-6 w-full rounded-xl border hairline px-5 py-3 text-left hover:bg-ink-50 transition flex items-center gap-3 group"
+          className="group mt-6 flex w-full items-center gap-3 rounded-xl border hairline px-5 py-3 text-left transition hover:bg-ink-50"
         >
-          <span className="h-7 w-7 rounded-md bg-ink-900 text-white text-xs grid place-items-center group-hover:bg-aurora-700 transition">
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-ink-900 text-xs text-white transition group-hover:bg-aurora-700">
             💬
           </span>
           <span className="text-[12.5px] text-ink-600">
@@ -412,35 +767,11 @@ export default function TripView({ lang, destinationId, warp, trips, profile, on
   );
 }
 
-function Panel({ title, aside, children }: { title: string; aside?: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border hairline p-4 bg-ink-50/40">
-      <div className="flex items-baseline justify-between gap-3 mb-2">
-        <div className="text-[11px] uppercase tracking-[0.14em] text-ink-500 font-medium">{title}</div>
-        {aside && <div className="text-[11px] text-ink-500">{aside}</div>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-ink-50 px-3 py-2">
       <div className="text-[10.5px] text-ink-500">{label}</div>
       <div className="mt-0.5 text-[14px] font-semibold text-ink-900">{value}</div>
     </div>
-  );
-}
-
-function StagePill({ label, active }: { label: string; active: boolean }) {
-  return (
-    <span
-      className={`text-[11px] px-2.5 py-1 rounded-full border transition ${
-        active ? "bg-aurora-700 text-white border-aurora-700" : "bg-white text-ink-500 border-ink-200"
-      }`}
-    >
-      {label}
-    </span>
   );
 }

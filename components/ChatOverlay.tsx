@@ -136,6 +136,10 @@ function makeWishlistItem(label: string, priorityLabel: WishlistPriorityLabel = 
   };
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function legacyItems(profile: PlanProfile | null): WishlistItem[] {
   if (!profile) return [];
   if (profile.wishlistItems?.length) return profile.wishlistItems;
@@ -314,11 +318,12 @@ export default function ChatOverlay({
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/plan", {
+      const responsePromise = fetch("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profile: finalProfile }),
       });
+      const [response] = await Promise.all([responsePromise, wait(3200)]);
       if (!response.ok) throw new Error("plan failed");
       const plan = (await response.json()) as GeneratedPlan;
       onPlanGenerated(plan);
@@ -389,6 +394,7 @@ export default function ChatOverlay({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
+          {loading && <AgentGenerationPanel lang={lang} />}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-aurora-700 font-semibold">
@@ -557,6 +563,60 @@ export default function ChatOverlay({
             </aside>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentGenerationPanel({ lang }: { lang: Lang }) {
+  const rows = [
+    {
+      icon: "🌸",
+      titleZh: "时机 Agent",
+      titleEn: "Timing Agent",
+      linesZh: ["识别心愿体验的最佳季节", "比对历史峰值窗口", "估算扑空风险"],
+      linesEn: ["Identify best seasons", "Compare historical peak windows", "Estimate miss risk"],
+    },
+    {
+      icon: "📅",
+      titleZh: "假期 Agent",
+      titleEn: "Calendar Agent",
+      linesZh: ["加载 2026 公共假期", "避开不可出行日期", "计算拼假方案"],
+      linesEn: ["Load 2026 public holidays", "Avoid blocked dates", "Calculate PTO bridges"],
+    },
+    {
+      icon: "🎯",
+      titleZh: "综合 Agent",
+      titleEn: "Synthesis Agent",
+      linesZh: ["按优先级排序心愿", "检查年假和预算", "决定哪些心愿延期"],
+      linesEn: ["Rank wishes by priority", "Check PTO and budget", "Decide what should defer"],
+    },
+  ];
+
+  return (
+    <div className="mb-5 rounded-2xl border hairline bg-ink-900 p-5 text-white">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">
+        {lang === "zh" ? "Aurora 正在为你规划 2026" : "Aurora is planning your 2026"}
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {rows.map((row, index) => (
+          <div key={row.titleEn} className="rounded-xl bg-white/8 p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{row.icon}</span>
+              <span className="text-[13px] font-semibold">{copy(lang, row.titleZh, row.titleEn)}</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {(lang === "zh" ? row.linesZh : row.linesEn).map((line, lineIndex) => (
+                <div key={line} className="flex gap-2 text-[12px] text-white/78">
+                  <span className={lineIndex < index + 1 ? "text-emerald-300" : "text-white/35"}>
+                    {lineIndex < index + 1 ? "✓" : "⋯"}
+                  </span>
+                  <span>{line}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

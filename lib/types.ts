@@ -46,19 +46,29 @@ export interface Destination {
 
 export interface Trip {
   destinationId: string;
+  id?: string;
+  title?: string;
+  cityCode?: string;
+  destinations?: string[];
   startMonth: number;
   startDate?: string;
   endDate?: string;
   days: number;
   ptoDays: number;
   holidayLeveraged: number;
+  publicHolidaysUsed?: string[];
   priority: number;
   estimatedBudget: number;
+  maturityOverride?: Maturity;
+  hitProbability?: number;
   reason: string;
   reasonEn: string;
   wishlistLabel?: string;
   wishlistPriorityLabel?: WishlistPriorityLabel;
   wishlistPriorityScore?: 1 | 2 | 3;
+  dailyPlan?: DailyPlanDay[];
+  tripWishlist?: TripWishlistItem[];
+  reminders?: TripReminder[];
 }
 
 export interface DeferredTrip extends Trip {
@@ -84,6 +94,31 @@ export interface DateNote {
   date: string;
   label: string;
   source: "user" | "history";
+}
+
+export interface DailyPlanDay {
+  day: number;
+  date: string;
+  dayOfWeek: string;
+  city: string;
+  spots: string[];
+  weather?: string;
+  notes?: string[];
+  backup?: string | null;
+}
+
+export interface TripWishlistItem {
+  name: string;
+  added: "user" | "companion" | "system";
+  day?: number;
+  note?: string;
+}
+
+export interface TripReminder {
+  trigger: string;
+  date: string;
+  type: string;
+  message: string;
 }
 
 export interface AgentFinding {
