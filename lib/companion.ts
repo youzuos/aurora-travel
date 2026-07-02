@@ -514,6 +514,14 @@ function actionForIntent(intent: Intent, state: CompanionState, now: number): Co
   return chooseInterestWeightedAction(state.selectedCharacterId, "idle", state.statusCursor, timeInfo.sleeping);
 }
 
+function passiveIntentForState(state: CompanionState, now: number): Exclude<Intent, "move"> {
+  const timeInfo = getCompanionLocalTimeInfo(state, now);
+  if (timeInfo.sleeping) return "status";
+  if (state.statusCursor % 5 === 2) return "photo";
+  if (state.statusCursor % 5 === 4) return "scenery";
+  return "status";
+}
+
 export function getCompanionAction(state: CompanionState, now = Date.now()): CompanionAction {
   const { sleeping, meal } = getCompanionLocalTimeInfo(state, now);
   const inactiveMs = now - state.lastActiveAt;
@@ -835,7 +843,8 @@ export function addPassiveCompanionMessage(
 ): { state: CompanionState; message: CompanionMessage } {
   const { incrementUnread = true } = options;
   const location = getCurrentLocation(state);
-  const message = withInterestLine(messageForIntent("status", location, now, state.statusCursor), state.selectedCharacterId, state.statusCursor);
+  const passiveIntent = passiveIntentForState(state, now);
+  const message = withInterestLine(messageForIntent(passiveIntent, location, now, state.statusCursor), state.selectedCharacterId, state.statusCursor);
   const timeInfo = getCompanionLocalTimeInfo(state, now);
   return {
     state: {
@@ -844,7 +853,10 @@ export function addPassiveCompanionMessage(
       statusCursor: state.statusCursor + 1,
       messageHistory: appendMessages(state.messageHistory, [message]),
       unreadCount: nextUnreadCount(state.unreadCount, incrementUnread),
-      visualAction: chooseInterestWeightedAction(state.selectedCharacterId, "walking", state.statusCursor, timeInfo.sleeping),
+      visualAction:
+        passiveIntent === "status"
+          ? chooseInterestWeightedAction(state.selectedCharacterId, "walking", state.statusCursor, timeInfo.sleeping)
+          : actionForIntent(passiveIntent, state, now),
     },
     message,
   };

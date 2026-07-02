@@ -181,6 +181,24 @@ await runCase("rotating snippets vary by cursor for status, food, and photo", ()
   assert.notEqual(parisPhotoA.messages[1].image?.captionEn, parisPhotoB.messages[1].image?.captionEn);
 });
 
+await runCase("Chinese photo requests generate an image message", () => {
+  const reply = generateCompanionReply("\u53d1\u4e00\u5f20\u56fe\u7247\u7ed9\u6211", readyState({ currentLocationId: "paris" }), "zh", 12_500);
+  const agentMessage = reply.messages.find((message) => message.sender === "agent");
+
+  assert.equal(agentMessage?.kind, "image");
+  assert.equal(agentMessage?.image?.src.includes("unsplash.com"), true);
+});
+
+await runCase("passive companion updates sometimes include a city photo", () => {
+  const result = addPassiveCompanionMessage(readyState({ currentLocationId: "kyoto", statusCursor: 2 }), "zh", 13_000, {
+    incrementUnread: false,
+  });
+
+  assert.equal(result.message.kind, "image");
+  assert.equal(result.message.image?.src.includes("unsplash.com"), true);
+  assert.equal(result.state.visualAction, "photo");
+});
+
 await runCase("companion behavior profiles expose distinct interests and prompt lines", () => {
   const fox = getCompanionBehaviorProfile("mira");
   const dog = getCompanionBehaviorProfile("piko");

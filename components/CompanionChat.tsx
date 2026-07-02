@@ -33,6 +33,13 @@ function messageText(message: CompanionMessage, lang: Lang) {
   return lang === "zh" ? message.textZh : message.textEn;
 }
 
+function shouldRenderText(message: CompanionMessage, lang: Lang) {
+  if (!message.image) return true;
+  const text = messageText(message, lang).trim();
+  const caption = (lang === "zh" ? message.image.captionZh : message.image.captionEn).trim();
+  return text !== caption;
+}
+
 function speak(text: string, lang: Lang) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
@@ -287,7 +294,7 @@ export default function CompanionChat({
                     </button>
                   ) : null}
 
-                  <div>{messageText(message, lang)}</div>
+                  {shouldRenderText(message, lang) ? <div>{messageText(message, lang)}</div> : null}
                 </div>
               </div>
             );
