@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   };
 
   if (!hasCompanionLlmConfig()) {
-    return NextResponse.json({ error: "llm_unconfigured", state: activeState, message: null }, { status: 503 });
+    return NextResponse.json({ error: "llm_unconfigured", state: activeState, message: null });
   }
 
   try {
@@ -96,13 +96,13 @@ export async function POST(request: Request) {
     });
 
     if (!llm) {
-      return NextResponse.json({ error: "llm_failed", state: activeState, message: null }, { status: 502 });
+      return NextResponse.json({ error: "llm_failed", state: activeState, message: null });
     }
 
     const enhanced = applyLlmMessages(plannedState, [message], llm.result);
     const enhancedMessage = enhanced.messages[0] ?? message;
     if (!hasAgentText(enhancedMessage)) {
-      return NextResponse.json({ error: "llm_empty", state: activeState, message: null }, { status: 502 });
+      return NextResponse.json({ error: "llm_empty", state: activeState, message: null });
     }
     return NextResponse.json({
       state: enhanced.state,
@@ -110,6 +110,6 @@ export async function POST(request: Request) {
       generatedBy: llm.provider,
     });
   } catch {
-    return NextResponse.json({ error: "llm_failed", state: activeState, message: null }, { status: 502 });
+    return NextResponse.json({ error: "llm_failed", state: activeState, message: null });
   }
 }

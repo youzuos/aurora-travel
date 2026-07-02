@@ -109,10 +109,15 @@ export default function CompanionBubble({
           body: JSON.stringify({ state: currentState, lang, now, incrementUnread }),
         });
         const result = (await response.json()) as {
+          error?: string;
           state?: CompanionState;
           message?: CompanionMessage | null;
         };
         if (!response.ok) {
+          if (result.state) publishResult({ state: result.state, message: null });
+          return;
+        }
+        if (result.error) {
           if (result.state) publishResult({ state: result.state, message: null });
           return;
         }

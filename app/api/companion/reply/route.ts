@@ -100,8 +100,7 @@ export async function POST(request: Request) {
           messageHistory: appendCompanionMessages(state.messageHistory, [userMessage]),
         },
         messages: [userMessage],
-      },
-      { status: 503 }
+      }
     );
   }
 
@@ -123,8 +122,7 @@ export async function POST(request: Request) {
             messageHistory: appendCompanionMessages(state.messageHistory, [userMessage]),
           },
           messages: [userMessage],
-        },
-        { status: 502 }
+        }
       );
     }
 
@@ -138,8 +136,7 @@ export async function POST(request: Request) {
             messageHistory: appendCompanionMessages(state.messageHistory, [userMessage]),
           },
           messages: [userMessage],
-        },
-        { status: 502 }
+        }
       );
     }
     return NextResponse.json({ ...enhanced, generatedBy: llm.provider });
@@ -152,8 +149,7 @@ export async function POST(request: Request) {
           messageHistory: appendCompanionMessages(state.messageHistory, [userMessage]),
         },
         messages: [userMessage],
-      },
-      { status: 502 }
+      }
     );
   }
 }

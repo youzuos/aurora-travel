@@ -49,7 +49,8 @@ function timeMoodLabel(timeInfo: ReturnType<typeof getCompanionLocalTimeInfo>, l
   if (timeInfo.meal === "dinner") return lang === "zh" ? "晚餐时间" : "Dinner time";
   if (timeInfo.hour < 11) return lang === "zh" ? "上午闲逛" : "Late morning";
   if (timeInfo.hour < 17) return lang === "zh" ? "午后闲逛" : "Afternoon wandering";
-  if (timeInfo.hour < 21) return lang === "zh" ? "傍晚闲逛" : "Evening wandering";
+  if (timeInfo.hour < 20) return lang === "zh" ? "傍晚闲逛" : "Evening wandering";
+  if (timeInfo.hour < 22) return lang === "zh" ? "晚间闲逛" : "Night wandering";
   return lang === "zh" ? "醒着闲逛" : "Awake and wandering";
 }
 
@@ -212,6 +213,11 @@ export default function CompanionChat({
         body: JSON.stringify({ input: text, state: baseState, lang, now }),
       });
       const result = await readCompanionReply(response);
+      if (result.error) {
+        if (result.state) onStateChange(result.state);
+        setReplyError(result.error);
+        return;
+      }
       if (!response.ok) {
         if (result.state) onStateChange(result.state);
         setReplyError(result.error ?? "llm_failed");

@@ -9,9 +9,11 @@ interface Props {
   label: string;
   size?: "sm" | "md" | "lg";
   animated?: boolean;
+  interaction?: PixelCompanionInteraction;
 }
 
 type AnimalKind = CompanionCharacter["animal"];
+export type PixelCompanionInteraction = "hover" | "wave" | "pat" | "camera" | "bag";
 
 type Palette = {
   main: string;
@@ -78,9 +80,15 @@ function Backpack() {
   );
 }
 
-function Body({ p, action }: { p: Palette; action: CompanionAction }) {
-  const leftArmY = action === "excited" ? 35 : action === "walking" ? 43 : 42;
-  const rightArmY = action === "excited" ? 35 : action === "photo" || action === "food" || action === "map" ? 41 : 42;
+function Body({ p, action, interaction }: { p: Palette; action: CompanionAction; interaction?: PixelCompanionInteraction }) {
+  const waving = interaction === "wave";
+  const searchingBag = interaction === "bag";
+  const leftArmX = searchingBag ? 12 : 14;
+  const leftArmY = searchingBag ? 38 : action === "excited" ? 35 : action === "walking" ? 43 : 42;
+  const leftArmH = searchingBag ? 9 : 11;
+  const rightArmX = waving ? 49 : 46;
+  const rightArmY = waving ? 28 : action === "excited" ? 35 : action === "photo" || action === "food" || action === "map" ? 41 : 42;
+  const rightArmH = waving ? 14 : 11;
   const leftFootY = action === "walking" ? 56 : 55;
   const rightFootY = action === "walking" ? 54 : 55;
 
@@ -90,8 +98,8 @@ function Body({ p, action }: { p: Palette; action: CompanionAction }) {
       <Px x={21} y={41} w={25} h={4} fill={p.main} />
       <Px x={19} y={45} w={29} h={10} fill={p.main} />
       <Px x={23} y={47} w={17} h={9} fill={p.belly} />
-      <Px x={14} y={leftArmY} w={7} h={11} fill={p.dark} />
-      <Px x={46} y={rightArmY} w={7} h={11} fill={p.dark} />
+      <Px x={leftArmX} y={leftArmY} w={7} h={leftArmH} fill={p.dark} />
+      <Px x={rightArmX} y={rightArmY} w={7} h={rightArmH} fill={p.dark} />
       <Px x={24} y={leftFootY} w={8} h={5} fill={p.dark} />
       <Px x={36} y={rightFootY} w={8} h={5} fill={p.dark} />
       <Px x={20} y={39} w={27} h={4} fill={p.accent} />
@@ -159,6 +167,52 @@ function ActionProp({ action }: { action: CompanionAction }) {
       </g>
     );
   }
+  return null;
+}
+
+function InteractionProp({ interaction }: { interaction?: PixelCompanionInteraction }) {
+  if (interaction === "wave") {
+    return (
+      <g fill="#f1c84b">
+        <Px x={53} y={17} w={7} h={3} fill="#f1c84b" />
+        <Px x={55} y={11} w={3} h={8} fill="#f1c84b" />
+        <Px x={58} y={7} w={3} h={3} fill="#f1c84b" />
+      </g>
+    );
+  }
+
+  if (interaction === "pat") {
+    return (
+      <g>
+        <Px x={22} y={6} w={20} h={4} fill="#ffffff" />
+        <Px x={18} y={10} w={28} h={3} fill="#f4d9b2" />
+      </g>
+    );
+  }
+
+  if (interaction === "camera") {
+    return (
+      <g>
+        <Px x={57} y={24} w={5} h={5} fill="#f5ca47" />
+        <Px x={59} y={20} w={2} h={13} fill="#f5ca47" />
+        <Px x={53} y={26} w={11} h={2} fill="#f5ca47" />
+        <Px x={35} y={52} w={14} h={5} fill="#ffffff" />
+        <Px x={37} y={53} w={10} h={2} fill="#73d9ff" />
+      </g>
+    );
+  }
+
+  if (interaction === "bag") {
+    return (
+      <g>
+        <Px x={4} y={34} w={7} h={4} fill="#f5e4ad" />
+        <Px x={7} y={31} w={8} h={4} fill="#e9bd4d" />
+        <Px x={2} y={40} w={4} h={4} fill="#f1c84b" />
+        <Px x={9} y={52} w={7} h={2} fill="#344f5f" />
+      </g>
+    );
+  }
+
   return null;
 }
 
@@ -341,7 +395,14 @@ function AnimalSprite({ animal, p, sleepy }: { animal: AnimalKind; p: Palette; s
   }
 }
 
-export default function PixelSpriteCompanion({ character, action, label, size = "md", animated = true }: Props) {
+export default function PixelSpriteCompanion({
+  character,
+  action,
+  label,
+  size = "md",
+  animated = true,
+  interaction,
+}: Props) {
   const palette = PALETTES[character.animal];
   const sleepy = action === "sleepy";
   const sizeClass = size === "sm" ? "h-10 w-10" : size === "lg" ? "h-full w-full" : "h-14 w-14";
@@ -350,6 +411,7 @@ export default function PixelSpriteCompanion({ character, action, label, size = 
       ? "overflow-visible bg-transparent"
       : "overflow-hidden rounded-lg bg-gradient-to-br from-white via-ink-50 to-aurora-50/60";
   const motionClass = getPixelCompanionMotionClass(action, animated);
+  const interactionClass = interaction ? `pixel-react-${interaction}` : "";
 
   return (
     <div
@@ -359,16 +421,106 @@ export default function PixelSpriteCompanion({ character, action, label, size = 
     >
       <svg
         viewBox="0 0 64 64"
-        className={`h-[96%] w-[96%] ${motionClass}`}
+        className={`h-[96%] w-[96%] ${motionClass} ${interactionClass}`}
         shapeRendering="crispEdges"
         aria-hidden="true"
       >
         <Px x={20} y={60} w={28} h={3} fill="#d7dfe7" />
-        <Body p={palette} action={action} />
+        <Body p={palette} action={action} interaction={interaction} />
         <AnimalSprite animal={character.animal} p={palette} sleepy={sleepy} />
         <ActionProp action={action} />
+        <InteractionProp interaction={interaction} />
       </svg>
+      {interaction === "camera" ? (
+        <span className="pixel-sparkles" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+      ) : null}
+      {interaction === "pat" ? (
+        <span className="pixel-pat" aria-hidden="true">
+          <span />
+          <span />
+        </span>
+      ) : null}
+      {interaction === "bag" ? (
+        <span className="pixel-bag-items" aria-hidden="true">
+          <span />
+          <span />
+        </span>
+      ) : null}
       <style jsx>{`
+        .pixel-sparkles,
+        .pixel-pat,
+        .pixel-bag-items {
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+        }
+        .pixel-sparkles span,
+        .pixel-pat span,
+        .pixel-bag-items span {
+          position: absolute;
+          display: block;
+          image-rendering: pixelated;
+        }
+        .pixel-sparkles span {
+          height: 7px;
+          width: 7px;
+          background: #f5ca47;
+          box-shadow:
+            0 -7px 0 -3px #f5ca47,
+            0 7px 0 -3px #f5ca47,
+            -7px 0 0 -3px #f5ca47,
+            7px 0 0 -3px #f5ca47;
+          animation: pixel-sparkle-pop 0.72s steps(2, end) infinite;
+        }
+        .pixel-sparkles span:nth-child(1) {
+          right: 13%;
+          top: 16%;
+        }
+        .pixel-sparkles span:nth-child(2) {
+          left: 18%;
+          top: 24%;
+          animation-delay: 0.12s;
+        }
+        .pixel-sparkles span:nth-child(3) {
+          right: 20%;
+          bottom: 18%;
+          animation-delay: 0.24s;
+        }
+        .pixel-pat span {
+          left: 50%;
+          top: 3%;
+          height: 5px;
+          width: 26px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.9);
+          transform: translateX(-50%);
+          animation: pixel-pat-line 0.58s steps(2, end) infinite;
+        }
+        .pixel-pat span:nth-child(2) {
+          top: 10%;
+          width: 18px;
+          animation-delay: 0.18s;
+        }
+        .pixel-bag-items span {
+          left: 12%;
+          top: 48%;
+          height: 8px;
+          width: 10px;
+          background: #f5e4ad;
+          animation: pixel-bag-item-pop 0.8s steps(2, end) infinite;
+        }
+        .pixel-bag-items span:nth-child(2) {
+          left: 18%;
+          top: 42%;
+          height: 7px;
+          width: 8px;
+          background: #e9bd4d;
+          animation-delay: 0.18s;
+        }
         .pixel-idle {
           animation: pixel-idle 2.6s steps(2, end) infinite;
         }
@@ -392,6 +544,21 @@ export default function PixelSpriteCompanion({ character, action, label, size = 
         }
         .pixel-flash {
           animation: pixel-flash 1.4s steps(2, end) infinite;
+        }
+        .pixel-react-hover {
+          animation: pixel-react-hover 0.9s steps(2, end) infinite;
+        }
+        .pixel-react-wave {
+          animation: pixel-react-wave 0.68s steps(2, end) infinite;
+        }
+        .pixel-react-pat {
+          animation: pixel-react-pat 0.82s steps(2, end) infinite;
+        }
+        .pixel-react-camera {
+          animation: pixel-react-camera 0.7s steps(2, end) infinite;
+        }
+        .pixel-react-bag {
+          animation: pixel-react-bag 0.72s steps(2, end) infinite;
         }
         @keyframes pixel-idle {
           50% {
@@ -431,6 +598,58 @@ export default function PixelSpriteCompanion({ character, action, label, size = 
         @keyframes pixel-flash {
           50% {
             opacity: 0;
+          }
+        }
+        @keyframes pixel-react-hover {
+          50% {
+            transform: translateY(-2px) rotate(1deg);
+          }
+        }
+        @keyframes pixel-react-wave {
+          35% {
+            transform: translateY(-5px) rotate(-2deg);
+          }
+          70% {
+            transform: translateY(-1px) rotate(2deg);
+          }
+        }
+        @keyframes pixel-react-pat {
+          35% {
+            transform: translateY(4px) scaleX(1.04) scaleY(0.94);
+          }
+          70% {
+            transform: translateY(1px) scaleX(1.02) scaleY(0.97);
+          }
+        }
+        @keyframes pixel-react-camera {
+          35% {
+            transform: translateY(-2px) rotate(-3deg);
+          }
+          70% {
+            transform: translateY(-1px) rotate(3deg);
+          }
+        }
+        @keyframes pixel-react-bag {
+          50% {
+            transform: translateX(-4px) rotate(-3deg);
+          }
+        }
+        @keyframes pixel-sparkle-pop {
+          50% {
+            opacity: 0.35;
+            transform: translateY(-5px) scale(0.8);
+          }
+        }
+        @keyframes pixel-pat-line {
+          50% {
+            opacity: 0.35;
+            transform: translate(-50%, 7px);
+          }
+        }
+        @keyframes pixel-bag-item-pop {
+          50% {
+            opacity: 0.45;
+            transform: translate(4px, -5px);
           }
         }
       `}</style>

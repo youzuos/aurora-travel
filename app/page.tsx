@@ -4,8 +4,8 @@ import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import CompanionBubble from "@/components/CompanionBubble";
 import CompanionChat from "@/components/CompanionChat";
+import InteractiveCompanion from "@/components/InteractiveCompanion";
 import CompanionOnboarding from "@/components/CompanionOnboarding";
-import PixelCompanion from "@/components/PixelSpriteCompanion";
 import TimeWarp from "@/components/TimeWarp";
 import Stats from "@/components/Stats";
 import YearView from "@/components/YearView";
@@ -213,9 +213,17 @@ export default function Home() {
             ? lang === "zh"
               ? "午后"
               : "afternoon"
-            : lang === "zh"
-              ? "傍晚"
-              : "evening";
+            : localHour < 20
+              ? lang === "zh"
+                ? "傍晚"
+                : "evening"
+              : localHour < 22
+                ? lang === "zh"
+                  ? "晚间"
+                  : "night"
+                : lang === "zh"
+                  ? "深夜"
+                  : "late night";
   const actionLabel =
     {
       idle: lang === "zh" ? "停留观察" : "observing",
@@ -290,13 +298,21 @@ export default function Home() {
       <section className="pointer-events-none !absolute inset-x-0 bottom-[24vh] top-[22vh] z-10 flex items-end justify-center px-6 sm:bottom-[13vh] sm:top-[19vh]">
         <div className="relative h-[230px] w-[230px] sm:h-[330px] sm:w-[330px]">
           <div className="absolute bottom-1 left-1/2 h-8 w-44 -translate-x-1/2 rounded-[50%] bg-ink-900/12 blur-md sm:w-64" />
-          <PixelCompanion
-            character={companionCharacter}
-            action={companionAction}
-            label={lang === "zh" ? companionCharacter.nameZh : companionCharacter.nameEn}
-            size="lg"
-            animated
-          />
+          <div className="pointer-events-auto h-full w-full">
+            <InteractiveCompanion
+              character={companionCharacter}
+              action={companionAction}
+              label={lang === "zh" ? companionCharacter.nameZh : companionCharacter.nameEn}
+              lang={lang}
+              size="lg"
+              context={{
+                cityName: lang === "zh" ? companionLocation.cityZh : companionLocation.cityEn,
+                localHour,
+                meal: companionLocalTime.meal,
+                currentAction: companionAction,
+              }}
+            />
+          </div>
         </div>
       </section>
 

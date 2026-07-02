@@ -23,6 +23,7 @@ import {
   resolveCompanionDiscovery,
   resolveCompanionExploration,
 } from "../lib/companionExploration";
+import { resolveCompanionTouchReaction } from "../lib/companionInteraction";
 
 function readyState(overrides: Partial<CompanionState> = {}, now = 1_000): CompanionState {
   return {
@@ -146,10 +147,16 @@ await runCase("visual action follows the current city local time", () => {
 
 await runCase("meal time turns ordinary travel visuals into food state", () => {
   const kyotoBreakfastUtc = Date.UTC(2026, 5, 29, 23, 0, 0);
+  const kyotoPostDinnerUtc = Date.UTC(2026, 5, 29, 11, 40, 0);
   const walkingState = readyState({
     currentLocationId: "kyoto",
     visualAction: "walking",
     lastActiveAt: kyotoBreakfastUtc,
+  });
+  const postDinnerWalkingState = readyState({
+    currentLocationId: "kyoto",
+    visualAction: "walking",
+    lastActiveAt: kyotoPostDinnerUtc,
   });
   const mapState = readyState({
     currentLocationId: "kyoto",
@@ -166,6 +173,9 @@ await runCase("meal time turns ordinary travel visuals into food state", () => {
   assert.equal(getCompanionAction(walkingState, kyotoBreakfastUtc), "food");
   assert.equal(getCompanionAction(excitedState, kyotoBreakfastUtc), "food");
   assert.equal(getCompanionAction(mapState, kyotoBreakfastUtc), "map");
+  assert.equal(getCompanionLocalTimeInfo(postDinnerWalkingState, kyotoPostDinnerUtc).displayTime, "20:40");
+  assert.equal(getCompanionLocalTimeInfo(postDinnerWalkingState, kyotoPostDinnerUtc).meal, "snack");
+  assert.equal(getCompanionAction(postDinnerWalkingState, kyotoPostDinnerUtc), "walking");
 });
 
 await runCase("rotating snippets vary by cursor for status, food, and photo", () => {
@@ -404,6 +414,32 @@ await runCase("pixel companion maps visible states to distinct motion classes", 
   assert.equal(getPixelCompanionMotionClass("excited", true), "pixel-hop");
   assert.equal(getPixelCompanionMotionClass("idle", true), "pixel-idle");
   assert.equal(getPixelCompanionMotionClass("idle", false), "");
+});
+
+await runCase("companion touch zones resolve to contextual temporary reactions", () => {
+  const context = {
+    cityName: "京都",
+    localHour: 12,
+    meal: "lunch" as const,
+    currentAction: "walking" as const,
+  };
+  const head = resolveCompanionTouchReaction("head", "zh", context, 1);
+  const camera = resolveCompanionTouchReaction("camera", "zh", context, 2);
+  const backpackMeal = resolveCompanionTouchReaction("backpack", "zh", context, 3);
+  const backpackMap = resolveCompanionTouchReaction("backpack", "zh", { ...context, meal: "snack" }, 4);
+  const hand = resolveCompanionTouchReaction("hand", "zh", context, 5);
+
+  assert.equal(head.action, "sleepy");
+  assert.equal(head.interaction, "pat");
+  assert.match(head.text, /摸|乖|舒服/);
+  assert.equal(camera.action, "photo");
+  assert.equal(camera.interaction, "camera");
+  assert.match(camera.text, /京都|咔嚓|光/);
+  assert.equal(backpackMeal.action, "food");
+  assert.equal(backpackMeal.interaction, "bag");
+  assert.match(backpackMeal.text, /小吃|香|午/);
+  assert.equal(backpackMap.action, "map");
+  assert.equal(hand.action, "excited");
 });
 
 await runCase("companion scene background follows city and current action", () => {

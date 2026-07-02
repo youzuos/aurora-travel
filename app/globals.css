@@ -356,11 +356,7 @@ body {
 }
 
 .chat-paper-bg {
-  background:
-    linear-gradient(90deg, rgba(48, 102, 148, 0.045) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(48, 102, 148, 0.045) 1px, transparent 1px),
-    linear-gradient(180deg, #f6f7f8 0%, #f2f5f1 100%);
-  background-size: 20px 20px, 20px 20px, auto;
+  background: linear-gradient(180deg, #f7f9fb 0%, #edf4f1 100%);
 }
 
 .companion-scene-frame {
@@ -369,9 +365,9 @@ body {
 
 .companion-scene-bg {
   background-color: #f6f7f8;
-  background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
-  background-size: 20px 20px, 20px 20px, 100% 170px, 100% 170px, 100% 100%;
-  background-position: 0 0, 0 0, left bottom, left bottom, center;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, cover;
+  background-position: center, center;
   transition: background 260ms ease;
 }
 
@@ -940,11 +936,7 @@ body {
 }
 
 .chat-paper-bg {
-  background:
-    linear-gradient(90deg, rgba(48, 102, 148, 0.045) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(48, 102, 148, 0.045) 1px, transparent 1px),
-    linear-gradient(180deg, #f6f7f8 0%, #f2f5f1 100%);
-  background-size: 20px 20px, 20px 20px, auto;
+  background: linear-gradient(180deg, #f7f9fb 0%, #edf4f1 100%);
 }
 
 .companion-scene-frame {
@@ -999,12 +991,11 @@ body {
 .companion-scene-bg.scene-aurora,
 .companion-scene-bg.scene-sleepy {
   background-image:
-    linear-gradient(90deg, rgba(48, 102, 148, 0.038) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(48, 102, 148, 0.038) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(249, 250, 252, 0.72) 0%, rgba(244, 247, 246, 0.7) 100%);
-  background-size: 20px 20px, 20px 20px, auto;
-  background-position: 0 0, 0 0, center;
-  background-repeat: repeat, repeat, no-repeat;
+    linear-gradient(180deg, rgba(248, 250, 252, 0.56) 0%, rgba(229, 240, 238, 0.5) 100%),
+    var(--companion-scene-photo);
+  background-size: 100% 100%, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
 }
 
 .wechat-bubble {

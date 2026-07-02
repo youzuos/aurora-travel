@@ -373,7 +373,7 @@ export function getCompanionLocalTimeInfo(state: CompanionState, now = Date.now(
   const location = getCurrentLocation(state);
   const { hour, minute, displayTime } = getLocationClock(location, now);
   const sleeping = hour >= 22 || hour < 7;
-  const meal = hour >= 7 && hour < 10 ? "breakfast" : hour >= 11 && hour < 14 ? "lunch" : hour >= 18 && hour < 21 ? "dinner" : "snack";
+  const meal = hour >= 7 && hour < 10 ? "breakfast" : hour >= 11 && hour < 14 ? "lunch" : hour >= 18 && hour < 20 ? "dinner" : "snack";
 
   return {
     hour,
