@@ -1,19 +1,34 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
-import TopBar from "@/components/TopBar";
+import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
+import CompanionBubble from "@/components/CompanionBubble";
+import CompanionChat from "@/components/CompanionChat";
+import CompanionOnboarding from "@/components/CompanionOnboarding";
+import PixelCompanion from "@/components/PixelSpriteCompanion";
 import TimeWarp from "@/components/TimeWarp";
+import Stats from "@/components/Stats";
 import YearView from "@/components/YearView";
 import TripView from "@/components/TripView";
 import ChatOverlay from "@/components/ChatOverlay";
-import CompanionBubble from "@/components/CompanionBubble";
-import CompanionChat from "@/components/CompanionChat";
-import CompanionDestinationOnboarding from "@/components/CompanionDestinationOnboarding";
-import CompanionInspirationRadar from "@/components/CompanionInspirationRadar";
-import CompanionOnboarding from "@/components/CompanionOnboarding";
-import CompanionStatus from "@/components/CompanionStatus";
 import PriceAlert from "@/components/PriceAlert";
 import MaturitySummary from "@/components/MaturitySummary";
+import { COMPANION_CHARACTERS } from "@/data/companion";
+import {
+  COMPANION_STORAGE_KEY,
+  advanceCompanionLocationWithoutMessage,
+  createDefaultCompanionState,
+  getCharacter,
+  getCompanionAction,
+  getCompanionLocalTimeInfo,
+  getCurrentLocation,
+  getStatusLine,
+  parseCompanionState,
+  selectCharacter,
+  serializeCompanionState,
+  type CompanionState,
+} from "@/lib/companion";
+import { getCompanionScene } from "@/lib/companionScene";
 import type {
   AgentFinding,
   DeferredTrip,
@@ -24,31 +39,18 @@ import type {
   WishlistItem,
 } from "@/lib/types";
 import type { WarpStop } from "@/lib/time";
-import {
-  COMPANION_STORAGE_KEY,
-  createDefaultCompanionState,
-  maybeAdvanceCompanionLocation,
-  parseCompanionState,
-  selectCharacter,
-  serializeCompanionState,
-  type CompanionState,
-} from "@/lib/companion";
-import { getCompanionScene } from "@/lib/companionScene";
 
 const PLAN_KEY = "aurora.plan.v1";
 const LANG_KEY = "aurora.lang.v1";
-const DESTINATION_ONBOARDING_KEY = "aurora.destinationOnboarding.v1";
 
 export default function Home() {
   const [lang, setLang] = useState<Lang>("zh");
   const [warp, setWarp] = useState<WarpStop>("year-start");
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
+  const [planPanelOpen, setPlanPanelOpen] = useState(false);
   const [plannerOpen, setPlannerOpen] = useState(false);
-  const [timeWarpOpen, setTimeWarpOpen] = useState(false);
   const [companionState, setCompanionState] = useState<CompanionState>(() => createDefaultCompanionState());
   const [companionStateReady, setCompanionStateReady] = useState(false);
-  const [destinationOnboardingReady, setDestinationOnboardingReady] = useState(false);
-  const [destinationOnboardingDone, setDestinationOnboardingDone] = useState(false);
   const [companionChatOpen, setCompanionChatOpen] = useState(false);
   const [plannerSeed, setPlannerSeed] = useState<WishlistItem[]>([]);
   const [profile, setProfile] = useState<PlanProfile | null>(null);
@@ -56,6 +58,22 @@ export default function Home() {
   const [deferredTrips, setDeferredTrips] = useState<DeferredTrip[]>([]);
   const [findings, setFindings] = useState<AgentFinding[]>([]);
   const hasPlan = trips.length > 0;
+
+  const companionCharacter = companionState.selectedCharacterId
+    ? getCharacter(companionState.selectedCharacterId)
+    : COMPANION_CHARACTERS[0];
+  const companionLocation = getCurrentLocation(companionState);
+  const companionLocalTime = getCompanionLocalTimeInfo(companionState);
+  const companionScene = getCompanionScene(companionState);
+  const companionAction = getCompanionAction(companionState);
+  const companionSceneStyle = {
+    "--companion-scene-photo": `url("${companionScene.pixelPhotoSrc}")`,
+  } as CSSProperties;
+  const companionStatus = companionState.onboardingCompleted
+    ? getStatusLine(companionState, lang)
+    : lang === "zh"
+      ? "先选择一个会替你旅行的小伙伴"
+      : "Choose a tiny traveler first";
 
   useEffect(() => {
     const savedLang = window.localStorage.getItem(LANG_KEY);
@@ -69,18 +87,13 @@ export default function Home() {
         setTrips(plan.trips ?? []);
         setDeferredTrips(plan.deferredTrips ?? []);
         setFindings(plan.findings ?? []);
-        if ((plan.trips ?? []).length > 0) setDestinationOnboardingDone(true);
       } catch {
         window.localStorage.removeItem(PLAN_KEY);
       }
     }
-    if (window.localStorage.getItem(DESTINATION_ONBOARDING_KEY) === "done") {
-      setDestinationOnboardingDone(true);
-    }
-    setDestinationOnboardingReady(true);
 
     const savedCompanion = parseCompanionState(window.localStorage.getItem(COMPANION_STORAGE_KEY));
-    setCompanionState(maybeAdvanceCompanionLocation(savedCompanion ?? createDefaultCompanionState()));
+    setCompanionState(advanceCompanionLocationWithoutMessage(savedCompanion ?? createDefaultCompanionState()).state);
     setCompanionStateReady(true);
   }, []);
 
@@ -94,27 +107,14 @@ export default function Home() {
   }, [companionState, companionStateReady]);
 
   useEffect(() => {
-    if (!destinationOnboardingReady) return;
-    if (destinationOnboardingDone) {
-      window.localStorage.setItem(DESTINATION_ONBOARDING_KEY, "done");
-    } else {
-      window.localStorage.removeItem(DESTINATION_ONBOARDING_KEY);
-    }
-  }, [destinationOnboardingDone, destinationOnboardingReady]);
-
-  useEffect(() => {
     if (!companionStateReady) return;
 
     function refreshCompanionPresence() {
-      setCompanionState((currentState) =>
-        maybeAdvanceCompanionLocation(currentState, Date.now(), { incrementUnread: !companionChatOpen })
-      );
+      setCompanionState((currentState) => advanceCompanionLocationWithoutMessage(currentState, Date.now()).state);
     }
 
     function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        refreshCompanionPresence();
-      }
+      if (document.visibilityState === "visible") refreshCompanionPresence();
     }
 
     window.addEventListener("focus", refreshCompanionPresence);
@@ -150,13 +150,13 @@ export default function Home() {
     openPlanner(seed);
   }
 
-  function completeDestinationOnboarding() {
-    setDestinationOnboardingDone(true);
+  function chooseCompanion(characterId: string) {
+    setCompanionState((state) => selectCharacter(state, characterId));
   }
 
-  function openPlannerFromDestination(seed: WishlistItem[]) {
-    completeDestinationOnboarding();
-    openPlanner(seed);
+  function openCompanionChat() {
+    setCompanionState((currentState) => advanceCompanionLocationWithoutMessage(currentState, Date.now()).state);
+    setCompanionChatOpen(true);
   }
 
   function applyPlan(plan: GeneratedPlan) {
@@ -165,22 +165,10 @@ export default function Home() {
     setDeferredTrips(plan.deferredTrips);
     setFindings(plan.findings);
     setSelectedTrip(null);
-    setTimeWarpOpen(false);
     setWarp("year-start");
     setPlannerSeed([]);
-    setDestinationOnboardingDone(true);
+    setPlanPanelOpen(true);
     window.localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
-  }
-
-  function chooseCompanion(characterId: string) {
-    setCompanionState((state) => selectCharacter(state, characterId));
-  }
-
-  function openCompanionChat() {
-    setCompanionState((currentState) =>
-      maybeAdvanceCompanionLocation(currentState, Date.now(), { incrementUnread: false })
-    );
-    setCompanionChatOpen(true);
   }
 
   function clearPlan() {
@@ -189,154 +177,227 @@ export default function Home() {
     setDeferredTrips([]);
     setFindings([]);
     setSelectedTrip(null);
-    setTimeWarpOpen(false);
     setWarp("year-start");
+    setPlanPanelOpen(false);
     window.localStorage.removeItem(PLAN_KEY);
   }
 
-  const destinationOnboardingActive =
-    companionStateReady &&
-    destinationOnboardingReady &&
-    companionState.onboardingCompleted &&
-    !hasPlan &&
-    !selectedTrip &&
-    !destinationOnboardingDone;
-  const companionScene = getCompanionScene(companionState);
-  const companionSceneStyle = {
-    "--companion-scene-photo": `url("${companionScene.pixelPhotoSrc}")`,
-  } as CSSProperties;
+  const planStatus = hasPlan
+    ? lang === "zh"
+      ? `${trips.length} 段旅程正在成熟`
+      : `${trips.length} trips are maturing`
+    : lang === "zh"
+      ? "还没有年度计划"
+      : "No annual plan yet";
+  const companionName = lang === "zh" ? companionCharacter.nameZh : companionCharacter.nameEn;
+  const locationName =
+    lang === "zh"
+      ? `${companionLocation.cityZh} · ${companionLocation.countryZh}`
+      : `${companionLocation.cityEn}, ${companionLocation.countryEn}`;
+  const localTime = companionLocalTime.displayTime;
+  const localHour = companionLocalTime.hour;
+  const localMoment =
+    localHour < 6
+      ? lang === "zh"
+        ? "深夜"
+        : "late night"
+      : localHour < 11
+        ? lang === "zh"
+          ? "清晨"
+          : "morning"
+        : localHour < 14
+          ? lang === "zh"
+            ? "午间"
+            : "midday"
+          : localHour < 18
+            ? lang === "zh"
+              ? "午后"
+              : "afternoon"
+            : lang === "zh"
+              ? "傍晚"
+              : "evening";
+  const actionLabel =
+    {
+      idle: lang === "zh" ? "停留观察" : "observing",
+      walking: lang === "zh" ? "慢慢散步" : "walking",
+      photo: lang === "zh" ? "拍照中" : "taking photos",
+      food: lang === "zh" ? "找小吃" : "looking for food",
+      map: lang === "zh" ? "看地图" : "reading map",
+      sleepy: lang === "zh" ? "休息中" : "resting",
+      excited: lang === "zh" ? "发现新地点" : "found a new spot",
+    }[companionAction] ?? (lang === "zh" ? "在路上" : "on the road");
 
   return (
-    <main className={`travel-pixel-shell ${companionScene.className}`} style={companionSceneStyle}>
-      <TopBar
-        lang={lang}
-        onOpenPlanner={() => openPlanner()}
-        onToggleLanguage={() => setLang((value) => (value === "zh" ? "en" : "zh"))}
-        onOpenCompanion={openCompanionChat}
-      />
-
-      <div className="mx-auto max-w-[1240px] px-5 sm:px-8 py-8 space-y-6">
-        <section className="travel-hero flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.22em] text-ink-500 font-medium">
-              {lang === "zh" ? "Plan once · Refine all year" : "Plan once · Refine all year"}
-            </div>
-            <h1 className="text-[30px] sm:text-[34px] font-semibold tracking-tight text-ink-900 mt-2 leading-tight">
-              {lang === "zh" ? (
-                <>
-                  你的旅行计划，会随时间
-                  <span className="text-aurora-700"> 长大。</span>
-                </>
-              ) : (
-                <>
-                  Your travel plan should
-                  <span className="text-aurora-700"> mature over time.</span>
-                </>
-              )}
-            </h1>
-            <p className="text-[13px] text-ink-600 mt-2 max-w-2xl leading-relaxed">
-              {lang === "zh"
-                ? "先说出心愿，再给每个心愿标注必去、想去或随缘。Aurora 会按季节、天气、价格和假期资源生成年度计划，资源不足的自动推迟到下一年。"
-                : "Start with wishes, then mark each as must-go, want-to-go, or optional. Aurora plans around seasonality, weather, prices, and PTO, and defers what cannot fit."}
-            </p>
-          </div>
-          {hasPlan && (
-            <button
-              onClick={clearPlan}
-              className="self-start lg:self-auto rounded-full border hairline bg-white px-4 py-2 text-[12px] text-ink-600 hover:bg-ink-50"
-            >
-              {lang === "zh" ? "清空计划" : "Clear plan"}
-            </button>
-          )}
-        </section>
-
-        {companionStateReady ? <CompanionStatus lang={lang} state={companionState} onOpen={openCompanionChat} /> : null}
-
-        {destinationOnboardingActive ? (
-          <CompanionDestinationOnboarding
-            lang={lang}
-            state={companionState}
-            warp={warp}
-            onStateChange={setCompanionState}
-            onAddWishlistItems={openPlannerFromDestination}
-            onComplete={completeDestinationOnboarding}
-          />
-        ) : null}
-
-        {companionStateReady && !destinationOnboardingActive && !selectedTrip ? (
-          <CompanionInspirationRadar
-            lang={lang}
-            state={companionState}
-            warp={warp}
-            onStateChange={setCompanionState}
-            onAddWishlistItems={openPlanner}
-          />
-        ) : null}
-
-        {hasPlan && !selectedTrip && (
-          <>
-            <YearView
-              lang={lang}
-              warp={warp}
-              trips={trips}
-              deferredTrips={deferredTrips}
-              profile={profile}
-              onSelectTrip={setSelectedTrip}
-              onOpenPlanner={() => openPlanner()}
-              onStartWithWishlist={openPlanner}
-              onOpenTimeWarp={() => setTimeWarpOpen(true)}
-            />
-            <section className="rounded-2xl border hairline bg-white p-5 shadow-[0_1px_2px_rgba(20,30,50,0.04)]">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-ink-500">
-                    {lang === "zh" ? "Aurora 在持续帮你盯着" : "Aurora keeps watching"}
-                  </div>
-                  <p className="mt-1 text-[13px] text-ink-600">
-                    {lang === "zh"
-                      ? "行程会随着时间继续收敛；需要演示计划如何长大时，再打开 Time Warp。"
-                      : "Plans keep narrowing over time. Open Time Warp when you want to demo that progression."}
-                  </p>
+    <main
+      className={`travel-pixel-shell ${companionScene.className} relative min-h-screen overflow-hidden text-ink-900`}
+      style={companionSceneStyle}
+    >
+      <section className="!absolute left-4 right-4 top-4 z-20 mx-auto max-w-5xl rounded-2xl border border-white/90 bg-[rgba(255,255,255,0.95)] px-4 py-3 shadow-[0_18px_60px_rgba(16,24,36,0.18)] ring-1 ring-ink-900/5 backdrop-blur-xl sm:left-6 sm:right-6 sm:top-6 sm:px-5 sm:py-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-600">
+                  {lang === "zh" ? "小动物状态" : "Companion status"}
                 </div>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <h1 className="truncate text-[22px] font-semibold tracking-tight text-ink-950 sm:text-[26px]">
+                  {companionName}
+                </h1>
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  {lang === "zh" ? "正在旅途中" : "On the road"}
+                </span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-[12.5px] font-medium leading-relaxed text-ink-700 sm:line-clamp-1">
+                {companionStatus}
+              </p>
+            </div>
+            <button
+              onClick={() => setLang((value) => (value === "zh" ? "en" : "zh"))}
+              className="shrink-0 rounded-full border border-white/90 bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-ink-800 shadow-sm hover:bg-white"
+            >
+              {lang === "zh" ? "EN" : "中文"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 rounded-2xl bg-ink-900/[0.035] p-1.5 text-[11px]">
+            <div className="min-w-0 rounded-xl bg-white/80 px-2.5 py-2 shadow-[inset_0_0_0_1px_rgba(28,31,38,0.06)]">
+              <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+                {lang === "zh" ? "状态" : "Status"}
+              </div>
+              <div className="mt-0.5 truncate font-semibold text-ink-900">{actionLabel}</div>
+            </div>
+            <div className="min-w-0 rounded-xl bg-white/80 px-2.5 py-2 shadow-[inset_0_0_0_1px_rgba(28,31,38,0.06)]">
+              <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+                {lang === "zh" ? "当前位置" : "Location"}
+              </div>
+              <div className="mt-0.5 truncate font-semibold text-ink-900">{locationName}</div>
+            </div>
+            <div className="min-w-0 rounded-xl bg-white/80 px-2.5 py-2 shadow-[inset_0_0_0_1px_rgba(28,31,38,0.06)]">
+              <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+                {lang === "zh" ? "当地时间" : "Local time"}
+              </div>
+              <div className="mt-0.5 truncate font-semibold text-ink-900">
+                {localTime} · {localMoment}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="pointer-events-none !absolute inset-x-0 bottom-[24vh] top-[22vh] z-10 flex items-end justify-center px-6 sm:bottom-[13vh] sm:top-[19vh]">
+        <div className="relative h-[230px] w-[230px] sm:h-[330px] sm:w-[330px]">
+          <div className="absolute bottom-1 left-1/2 h-8 w-44 -translate-x-1/2 rounded-[50%] bg-ink-900/12 blur-md sm:w-64" />
+          <PixelCompanion
+            character={companionCharacter}
+            action={companionAction}
+            label={lang === "zh" ? companionCharacter.nameZh : companionCharacter.nameEn}
+            size="lg"
+            animated
+          />
+        </div>
+      </section>
+
+      {planPanelOpen && (
+        <div className="!fixed inset-0 z-40 animate-fade-in">
+          <button
+            aria-label={lang === "zh" ? "关闭年度计划" : "Close annual plan"}
+            onClick={() => setPlanPanelOpen(false)}
+            className="absolute inset-0 cursor-default bg-ink-900/30 backdrop-blur-sm"
+          />
+          <section className="absolute inset-x-3 bottom-3 top-3 mx-auto flex max-w-6xl flex-col overflow-hidden rounded-2xl border hairline bg-white shadow-2xl sm:inset-x-6 sm:bottom-6 sm:top-6">
+            <div className="flex items-center justify-between gap-3 border-b hairline px-4 py-3 sm:px-6">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                  {lang === "zh" ? "年度计划" : "Annual plan"}
+                </div>
+                <h2 className="truncate text-[18px] font-semibold tracking-tight text-ink-900">
+                  {lang === "zh" ? "随时间成熟的 2026 旅行计划" : "A 2026 travel plan that matures over time"}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasPlan && (
+                  <button
+                    onClick={clearPlan}
+                    className="rounded-full border hairline bg-white px-3 py-2 text-[12px] text-ink-600 hover:bg-ink-50"
+                  >
+                    {lang === "zh" ? "清空" : "Clear"}
+                  </button>
+                )}
                 <button
-                  onClick={() => setTimeWarpOpen(true)}
-                  className="rounded-full bg-ink-900 px-4 py-2 text-[12px] font-medium text-white hover:bg-aurora-700"
+                  onClick={() => setPlanPanelOpen(false)}
+                  className="rounded-full border hairline bg-ink-900 px-3 py-2 text-[12px] font-medium text-white hover:bg-aurora-800"
                 >
-                  {lang === "zh" ? "开始 Time Warp 演示" : "Start Time Warp demo"}
+                  {lang === "zh" ? "关闭" : "Close"}
                 </button>
               </div>
-            </section>
-          </>
-        )}
+            </div>
 
-        {hasPlan && selectedTrip && (
-          <TripView
-            lang={lang}
-            destinationId={selectedTrip}
-            warp={warp}
-            trips={trips}
-            profile={profile}
-            onBack={() => setSelectedTrip(null)}
-            onOpenPlanner={() => openPlanner()}
-          />
-        )}
+            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white via-ink-50/35 to-white px-4 py-5 sm:px-6">
+              <div className="space-y-5">
+                <TimeWarp lang={lang} warp={warp} disabled={!hasPlan} onChange={setWarp} />
+                <MaturitySummary lang={lang} warp={warp} trips={trips} />
+                <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
+                <Stats lang={lang} profile={profile} trips={trips} deferredTrips={deferredTrips} />
 
-        <footer className="pt-8 pb-2 text-center text-[11px] text-ink-400 tracking-wide">
-          Aurora · {lang === "zh" ? "按时机规划旅行，而不是靠运气。" : "Travel by timing, not by luck."} ·{" "}
-          <kbd className="px-1.5 py-0.5 rounded border hairline text-[10px]">Cmd/Ctrl + K</kbd>
-        </footer>
-      </div>
+                {selectedTrip ? (
+                  <TripView
+                    lang={lang}
+                    destinationId={selectedTrip}
+                    warp={warp}
+                    trips={trips}
+                    profile={profile}
+                    onBack={() => setSelectedTrip(null)}
+                    onOpenPlanner={() => openPlanner()}
+                  />
+                ) : (
+                  <YearView
+                    lang={lang}
+                    warp={warp}
+                    trips={trips}
+                    deferredTrips={deferredTrips}
+                    profile={profile}
+                    onSelectTrip={setSelectedTrip}
+                    onOpenPlanner={() => openPlanner()}
+                    onStartWithWishlist={openPlanner}
+                  />
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      <ChatOverlay
+        open={plannerOpen}
+        lang={lang}
+        initialProfile={profile}
+        seedWishlistItems={plannerSeed}
+        findings={findings}
+        onClose={() => {
+          setPlannerOpen(false);
+          setPlannerSeed([]);
+        }}
+        onPlanGenerated={applyPlan}
+      />
 
       {companionStateReady ? <CompanionOnboarding lang={lang} state={companionState} onSelect={chooseCompanion} /> : null}
       {companionStateReady ? (
         <>
-          <CompanionBubble
-            lang={lang}
-            state={companionState}
-            chatOpen={companionChatOpen}
-            onOpen={openCompanionChat}
-            onStateChange={setCompanionState}
-          />
+          {!planPanelOpen && !companionChatOpen ? (
+            <CompanionBubble
+              lang={lang}
+              state={companionState}
+              chatOpen={companionChatOpen}
+              onOpen={openCompanionChat}
+              onOpenPlan={() => setPlanPanelOpen(true)}
+              planStatus={planStatus}
+              planCount={trips.length}
+              onStateChange={setCompanionState}
+            />
+          ) : null}
           <CompanionChat
             open={companionChatOpen}
             lang={lang}
@@ -352,48 +413,6 @@ export default function Home() {
           />
         </>
       ) : null}
-
-      <ChatOverlay
-        open={plannerOpen}
-        lang={lang}
-        initialProfile={profile}
-        seedWishlistItems={plannerSeed}
-        findings={findings}
-        onClose={() => {
-          setPlannerOpen(false);
-          setPlannerSeed([]);
-        }}
-        onPlanGenerated={applyPlan}
-      />
-
-      {timeWarpOpen && hasPlan && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" onClick={() => setTimeWarpOpen(false)}>
-          <div className="absolute inset-0 bg-ink-900/35 backdrop-blur-sm" />
-          <div
-            className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border hairline bg-white p-5 shadow-2xl sm:p-6"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-aurora-700">
-                  Time Warp
-                </div>
-                <h2 className="mt-1 text-[22px] font-semibold text-ink-900">
-                  {lang === "zh" ? "看你的计划如何长大" : "Watch your plan mature"}
-                </h2>
-              </div>
-              <button onClick={() => setTimeWarpOpen(false)} className="text-xl leading-none text-ink-400 hover:text-ink-900">
-                ×
-              </button>
-            </div>
-            <div className="space-y-4">
-              <TimeWarp lang={lang} warp={warp} onChange={setWarp} />
-              <MaturitySummary lang={lang} warp={warp} trips={trips} />
-              <PriceAlert lang={lang} warp={warp} hasPlan={hasPlan} />
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

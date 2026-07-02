@@ -345,11 +345,15 @@ export default function PixelSpriteCompanion({ character, action, label, size = 
   const palette = PALETTES[character.animal];
   const sleepy = action === "sleepy";
   const sizeClass = size === "sm" ? "h-10 w-10" : size === "lg" ? "h-full w-full" : "h-14 w-14";
+  const frameClass =
+    size === "lg"
+      ? "overflow-visible bg-transparent"
+      : "overflow-hidden rounded-lg bg-gradient-to-br from-white via-ink-50 to-aurora-50/60";
   const motionClass = getPixelCompanionMotionClass(action, animated);
 
   return (
     <div
-      className={`relative grid place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-white via-ink-50 to-aurora-50/60 ${sizeClass}`}
+      className={`relative grid place-items-center ${frameClass} ${sizeClass}`}
       role="img"
       aria-label={`${label}, ${ACTION_LABELS[action]}`}
     >

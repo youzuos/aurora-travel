@@ -5,7 +5,7 @@ import CompanionActionShowcase from "@/components/CompanionActionShowcase";
 import CompanionInspirationRadar from "@/components/CompanionInspirationRadar";
 import PixelCompanion from "@/components/PixelSpriteCompanion";
 import {
-  commitCompanionUserMessage,
+  createUserMessage,
   getCharacter,
   getCompanionAction,
   getCompanionLocalTimeInfo,
@@ -33,13 +33,6 @@ function messageText(message: CompanionMessage, lang: Lang) {
   return lang === "zh" ? message.textZh : message.textEn;
 }
 
-function shouldRenderText(message: CompanionMessage, lang: Lang) {
-  if (!message.image) return true;
-  const text = messageText(message, lang).trim();
-  const caption = (lang === "zh" ? message.image.captionZh : message.image.captionEn).trim();
-  return text !== caption;
-}
-
 function speak(text: string, lang: Lang) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
@@ -54,18 +47,32 @@ function timeMoodLabel(timeInfo: ReturnType<typeof getCompanionLocalTimeInfo>, l
   if (timeInfo.meal === "breakfast") return lang === "zh" ? "早餐时间" : "Breakfast time";
   if (timeInfo.meal === "lunch") return lang === "zh" ? "午餐时间" : "Lunch time";
   if (timeInfo.meal === "dinner") return lang === "zh" ? "晚餐时间" : "Dinner time";
+  if (timeInfo.hour < 11) return lang === "zh" ? "上午闲逛" : "Late morning";
+  if (timeInfo.hour < 17) return lang === "zh" ? "午后闲逛" : "Afternoon wandering";
+  if (timeInfo.hour < 21) return lang === "zh" ? "傍晚闲逛" : "Evening wandering";
   return lang === "zh" ? "醒着闲逛" : "Awake and wandering";
+}
+
+function replyErrorText(error: string | null, lang: Lang) {
+  if (!error) return "";
+  if (error === "llm_unconfigured") {
+    return lang === "zh"
+      ? "小动物现在还连不上 LLM，所以不会用本地模板代替回复。请先配置 GEMINI_API_KEY 或 OPENAI_API_KEY。"
+      : "The companion cannot reach an LLM yet, and local template replies are disabled. Configure GEMINI_API_KEY or OPENAI_API_KEY first.";
+  }
+  return lang === "zh"
+    ? "小动物这次没有生成成功，请稍后再发一次。"
+    : "The companion could not generate a reply this time. Please try again shortly.";
 }
 
 function PhotoCard({ message, lang, onMediaLoad }: { message: CompanionMessage; lang: Lang; onMediaLoad?: () => void }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const caption = lang === "zh" ? message.image?.captionZh : message.image?.captionEn;
   const fallbackLabel = lang === "zh" ? "城市照片暂时不可用。" : "This city photo is unavailable right now.";
 
   if (!message.image) return null;
 
   return (
-    <div className="mb-2 overflow-hidden rounded-xl border hairline bg-ink-100">
+    <div className="overflow-hidden rounded-xl border hairline bg-ink-100">
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-aurora-50 via-white to-ink-100">
         {!imageFailed ? (
           <img
@@ -78,13 +85,9 @@ function PhotoCard({ message, lang, onMediaLoad }: { message: CompanionMessage; 
         ) : null}
         {imageFailed ? (
           <div className="absolute inset-0 flex items-end p-3 text-[11px] leading-relaxed text-ink-600">
-            {caption ?? fallbackLabel}
+            {fallbackLabel}
           </div>
         ) : null}
-      </div>
-      <div className="space-y-1 px-3 py-2 text-[10.5px] text-ink-500">
-        <div>{caption ?? fallbackLabel}</div>
-        <div>{message.image.credit}</div>
       </div>
     </div>
   );
@@ -103,6 +106,8 @@ export default function CompanionChat({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [showActionPreview, setShowActionPreview] = useState(false);
+  const [radarOpen, setRadarOpen] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const character = state.selectedCharacterId ? getCharacter(state.selectedCharacterId) : null;
@@ -114,7 +119,7 @@ export default function CompanionChat({
   const sceneStyle = {
     "--companion-scene-photo": `url("${scene.pixelPhotoSrc}")`,
   } as CSSProperties;
-  const localTime = `${timeInfo.hour.toString().padStart(2, "0")}:00`;
+  const localTime = timeInfo.displayTime;
 
   function scrollToLatest(behavior: ScrollBehavior = "smooth") {
     window.requestAnimationFrame(() => {
@@ -135,13 +140,14 @@ export default function CompanionChat({
   useEffect(() => {
     if (!open) return;
     setShowActionPreview(false);
+    setRadarOpen(false);
     scrollToLatest("auto");
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     scrollToLatest("smooth");
-  }, [messages.length, open]);
+  }, [messages.length, open, replyError]);
 
   if (!open || !character) return null;
 
@@ -150,9 +156,16 @@ export default function CompanionChat({
     if (!text || sending) return;
 
     setDraft("");
+    setReplyError(null);
     const now = Date.now();
     const baseState = state;
-    const localState = commitCompanionUserMessage(text, baseState, lang, now);
+    const userMessage = createUserMessage(text, now);
+    const localState: CompanionState = {
+      ...baseState,
+      lastActiveAt: now,
+      unreadCount: 0,
+      messageHistory: [...baseState.messageHistory, userMessage].slice(-60),
+    };
     onStateChange(localState);
 
     setSending(true);
@@ -162,19 +175,24 @@ export default function CompanionChat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: text, state: baseState, lang, now }),
       });
-      if (!response.ok) return;
-
       const result = (await response.json()) as {
+        error?: string;
         state?: CompanionState;
         messages?: CompanionMessage[];
       };
-      if (!result.state || !Array.isArray(result.messages)) return;
+      if (!response.ok) {
+        if (result.state) onStateChange(result.state);
+        setReplyError(result.error ?? "llm_failed");
+        return;
+      }
+      if (!result.state || !Array.isArray(result.messages)) throw new Error("Invalid companion reply");
 
       onStateChange((currentState) =>
         mergeGeneratedReplyState(currentState, baseState, result.state as CompanionState, result.messages as CompanionMessage[])
       );
     } catch {
-      // The local reply is already committed; network or LLM failures should not block chat.
+      // No local template fallback: companion speech is generated only by the LLM.
+      setReplyError("llm_failed");
     } finally {
       setSending(false);
     }
@@ -182,7 +200,7 @@ export default function CompanionChat({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-end bg-ink-900/20 p-0 backdrop-blur-sm sm:p-4"
+      className="!fixed inset-0 z-[60] flex items-end justify-end bg-ink-900/20 p-0 backdrop-blur-sm sm:p-4"
       onClick={onClose}
     >
       <div
@@ -214,8 +232,8 @@ export default function CompanionChat({
                 </div>
                 <div className="truncate text-[11px] text-ink-500">
                   {lang === "zh"
-                    ? `正在 ${location.cityZh} 旅行 · 当地 ${timeInfo.hour.toString().padStart(2, "0")}:00`
-                    : `Traveling in ${location.cityEn} · local ${timeInfo.hour.toString().padStart(2, "0")}:00`}
+                    ? `正在 ${location.cityZh} 旅行 · 当地 ${localTime}`
+                    : `Traveling in ${location.cityEn} · local ${localTime}`}
                 </div>
               </div>
             </div>
@@ -252,21 +270,85 @@ export default function CompanionChat({
           {showActionPreview ? <CompanionActionShowcase lang={lang} character={character} currentAction={action} /> : null}
         </div>
 
-        <div className="border-b hairline bg-[#f8fbf8] px-3 py-3">
-          <CompanionInspirationRadar
-            lang={lang}
-            state={state}
-            warp={warp}
-            compact
-            onStateChange={onStateChange}
-            onAddWishlistItems={onAddWishlistItems}
-          />
+        <div className="border-b hairline bg-[#f8fbf8]/95 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setRadarOpen((value) => !value)}
+            className="flex w-full items-center gap-3 rounded-xl border hairline bg-white/90 px-3 py-2 text-left shadow-sm transition hover:bg-white"
+            aria-expanded={radarOpen}
+          >
+            <span className="relative h-8 w-8 shrink-0">
+              <PixelCompanion
+                character={character}
+                action="map"
+                label={lang === "zh" ? character.nameZh : character.nameEn}
+                size="sm"
+                animated={false}
+              />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12px] font-semibold text-ink-900">
+                {lang === "zh" ? "小动物灵感雷达" : "Companion radar"}
+              </span>
+              <span className="block truncate text-[11px] text-ink-500">
+                {lang === "zh" ? "让它先去替你探路" : "Let it scout ahead"}
+              </span>
+            </span>
+            <span className="rounded-full bg-ink-900 px-3 py-1 text-[11px] font-medium text-white">
+              {radarOpen ? (lang === "zh" ? "收起" : "Hide") : lang === "zh" ? "展开" : "Open"}
+            </span>
+          </button>
+
+          {radarOpen ? (
+            <div className="mt-2">
+              <CompanionInspirationRadar
+                lang={lang}
+                state={state}
+                warp={warp}
+                compact
+                onStateChange={onStateChange}
+                onAddWishlistItems={onAddWishlistItems}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div ref={scrollRef} className={`chat-paper-bg companion-scene-bg ${scene.className} flex-1 space-y-3 overflow-y-auto px-4 py-4`}>
 
           {messages.map((message) => {
             const fromUser = message.sender === "user";
+            const text = messageText(message, lang).trim();
+
+            if (message.image) {
+              return (
+                <div key={message.id} className="space-y-2">
+                  <div className={`flex items-end gap-2 ${fromUser ? "justify-end" : "justify-start"}`}>
+                    {!fromUser ? (
+                      <div className="mb-1 h-8 w-8 shrink-0 overflow-hidden rounded-md bg-white shadow-sm">
+                        <PixelCompanion
+                          character={character}
+                          action={action}
+                          label={lang === "zh" ? character.nameZh : character.nameEn}
+                          size="sm"
+                          animated={false}
+                        />
+                      </div>
+                    ) : null}
+                    <div className={`wechat-bubble ${fromUser ? "wechat-bubble-user" : "wechat-bubble-agent"}`}>
+                      <PhotoCard message={message} lang={lang} onMediaLoad={() => scrollToLatest("smooth")} />
+                    </div>
+                  </div>
+
+                  {text ? (
+                    <div className={`flex items-end gap-2 ${fromUser ? "justify-end" : "justify-start"}`}>
+                      {!fromUser ? <div className="h-8 w-8 shrink-0" /> : null}
+                      <div className={`wechat-bubble ${fromUser ? "wechat-bubble-user" : "wechat-bubble-agent"}`}>{text}</div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            }
+
             return (
               <div key={message.id} className={`flex items-end gap-2 ${fromUser ? "justify-end" : "justify-start"}`}>
                 {!fromUser ? (
@@ -281,8 +363,6 @@ export default function CompanionChat({
                   </div>
                 ) : null}
                 <div className={`wechat-bubble ${fromUser ? "wechat-bubble-user" : "wechat-bubble-agent"}`}>
-                  {message.image ? <PhotoCard message={message} lang={lang} onMediaLoad={() => scrollToLatest("smooth")} /> : null}
-
                   {message.kind === "voice" ? (
                     <button
                       type="button"
@@ -294,11 +374,17 @@ export default function CompanionChat({
                     </button>
                   ) : null}
 
-                  {shouldRenderText(message, lang) ? <div>{messageText(message, lang)}</div> : null}
+                  {text ? <div>{text}</div> : null}
                 </div>
               </div>
             );
           })}
+
+          {replyError ? (
+            <div className="mx-auto max-w-[340px] rounded-xl border hairline bg-white/95 px-3 py-2 text-center text-[11.5px] leading-relaxed text-ink-600 shadow-sm">
+              {replyErrorText(replyError, lang)}
+            </div>
+          ) : null}
 
           <div ref={bottomRef} className="h-1" />
         </div>
