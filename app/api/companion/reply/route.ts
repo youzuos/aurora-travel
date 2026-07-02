@@ -6,8 +6,10 @@ import {
   createUserMessage,
   detectCompanionIntent,
   findCompanionLocationFromInput,
+  getCompanionPhotoContext,
   getCompanionVisualActionForIntent,
   getCurrentLocation,
+  pickCompanionPhoto,
   type CompanionMessage,
   type CompanionState,
 } from "../../../../lib/companion";
@@ -52,7 +54,15 @@ export async function POST(request: Request) {
     visualAction: getCompanionVisualActionForIntent(intent, state, now),
   };
   const location = getCurrentLocation(plannedState);
-  const photo = intent === "photo" ? location.photos[Math.abs(state.statusCursor) % location.photos.length] : null;
+  const photo =
+    intent === "photo"
+      ? pickCompanionPhoto(
+          location,
+          state.messageHistory,
+          now + state.statusCursor,
+          `${input} ${getCompanionPhotoContext(plannedState, now)}`
+        )
+      : null;
   const agentMessage = createAgentMessage(
     intent === "photo" ? "image" : intent === "scenery" ? "voice" : intent === "food" ? "mixed" : "text",
     "",
@@ -62,13 +72,15 @@ export async function POST(request: Request) {
       ...(intent === "scenery" ? { voiceDurationSec: 8 } : {}),
       ...(photo
         ? {
-            image: {
-              src: photo.src,
-              alt: photo.alt,
-              credit: photo.credit,
-              captionZh: "",
-              captionEn: "",
-            },
+	            image: {
+	              src: photo.src,
+	              alt: photo.alt,
+	              credit: photo.credit,
+	              theme: photo.theme,
+	              query: photo.query,
+	              captionZh: "",
+	              captionEn: "",
+	            },
           }
         : {}),
     }

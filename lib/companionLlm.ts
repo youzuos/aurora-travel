@@ -5,6 +5,7 @@ import {
   type CompanionMessage,
   type CompanionState,
 } from "./companion";
+import { COMPANION_CHARACTERS } from "../data/companion";
 import { getCompanionBehaviorProfile, pickInterestPromptLine } from "./companionBehavior";
 import type { Lang } from "./types";
 
@@ -90,7 +91,13 @@ function getGeminiConfig() {
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 
   if (!apiKey) return null;
-  return { apiKey, model };
+  const fallbackModels = (process.env.GEMINI_FALLBACK_MODELS || "gemini-2.5-flash,gemini-2.0-flash-lite")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const models = Array.from(new Set([model, ...fallbackModels]));
+
+  return { apiKey, models };
 }
 
 function getAzureConfig() {
@@ -184,15 +191,37 @@ function createLlmPrompt(
       textZh: message.textZh,
       textEn: message.textEn,
     }));
-  const candidateAgentMessages = candidateMessages
-    .filter((message) => message.sender === "agent")
-    .map((message) => ({
-      id: message.id,
-      kind: message.kind,
-      textZh: message.textZh,
-      textEn: message.textEn,
-      hasImage: Boolean(message.image),
-    }));
+	  const candidateAgentMessages = candidateMessages
+	    .filter((message) => message.sender === "agent")
+	    .map((message) => ({
+	      id: message.id,
+	      kind: message.kind,
+	      textZh: message.textZh,
+	      textEn: message.textEn,
+	      hasImage: Boolean(message.image),
+	      image: message.image
+	        ? {
+	            alt: message.image.alt,
+	            src: message.image.src,
+	            credit: message.image.credit,
+	            theme: message.image.theme ?? null,
+	            query: message.image.query ?? null,
+	          }
+	        : null,
+	    }));
+
+  const personaCatalog = COMPANION_CHARACTERS.map((item) => {
+    const profile = getCompanionBehaviorProfile(item.id);
+    return [
+      `${item.id}/${item.nameEn}`,
+      `animal=${item.animal}`,
+      `personality=${item.personalityEn}`,
+      `travelTags=${item.tagsEn.join(",")}`,
+      `behaviorTags=${profile.interestTags.join(",")}`,
+      `preferredActions=${profile.preferredActions.join(",")}`,
+      `behaviorRule=${profile.llmGuidance}`,
+    ].join("; ");
+  }).join(" | ");
 
   const characterStyle = character
     ? `Selected companion: ${character.nameEn}, a ${character.animal}. Personality: ${character.personalityEn}. Travel preference tags: ${character.tagsEn.join(
@@ -206,18 +235,22 @@ function createLlmPrompt(
       )}. Specific behavior rule: ${behavior.llmGuidance}.`
     : "No companion has been selected yet; keep the reply warm and generally travel-oriented.";
 
-  const system = [
-    "You write as Aurora's tiny pixel travel companion.",
-    characterStyle,
-    "The companion is not a generic assistant: it has its own taste, habits, and travel bias.",
-    "Reply conversationally to the user's latest message when mode is reply; the companion can answer questions, ask short follow-up questions, and react to what the user says.",
+	  const system = [
+	    "You write as Aurora's tiny pixel travel companion.",
+	    `Companion persona catalog: ${personaCatalog}.`,
+	    characterStyle,
+	    "The companion is not a generic assistant: it has its own taste, habits, and travel bias.",
+	    "Use the selected companion's persona catalog entry as the binding personality and behavior model. Do not blend traits from other companions into the selected companion.",
+	    "Passive messages must reflect the selected companion's weighted habits: camera/photo/detail companions take more photos; food/cafe/market companions notice meals and snacks more often; night/neon/aurora companions notice night views and lights more often; map/route companions navigate more; people/slow companions notice human warmth more. These are tendencies, not absolutes.",
+	    "Reply conversationally to the user's latest message when mode is reply; the companion can answer questions, ask short follow-up questions, and react to what the user says.",
     "When mode is passive, write a spontaneous message from the companion's current trip, as if it is checking in with the user.",
     "Generate fresh wording every time. Do not reuse sentences, images captions, or distinctive phrases from recent history.",
     "Interest behavior must affect what it notices, what it wants to do next, and the sensory details it chooses.",
     "Respect the current city local time: sleepy or night hours should feel quieter; mealtimes may include food; daytime can include walking, photos, and people.",
     mealGuidance,
-    "Keep the persona cute, vivid, human-like, and concise.",
-    "The candidate agent messages are empty slots. Fill textZh and textEn for the same ids; do not change message ids, media type, or app state.",
+	    "Keep the persona cute, vivid, human-like, and concise.",
+	    "For image messages, ground the caption strictly in the provided image alt/theme/query/src metadata. Do not mention objects, food, shops, people, weather, or scenes that are not implied by that image metadata. If the metadata is broad, keep the caption broad and visual.",
+	    "The candidate agent messages are empty slots. Fill textZh and textEn for the same ids; do not change message ids, media type, or app state.",
     "Return JSON only.",
   ].join(" ");
 
@@ -295,63 +328,66 @@ async function callGemini(system: string, user: string, signal: AbortSignal) {
   const config = getGeminiConfig();
   if (!config) return null;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent`,
-    {
-      method: "POST",
-      signal,
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": config.apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: system }],
+  for (const model of config.models) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: "POST",
+        signal,
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": config.apiKey,
         },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: user }],
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: system }],
           },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              messages: {
-                type: "ARRAY",
-                items: {
-                  type: "OBJECT",
-                  properties: {
-                    id: { type: "STRING" },
-                    textZh: { type: "STRING" },
-                    textEn: { type: "STRING" },
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: user }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                messages: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      id: { type: "STRING" },
+                      textZh: { type: "STRING" },
+                      textEn: { type: "STRING" },
+                    },
+                    required: ["id", "textZh", "textEn"],
                   },
-                  required: ["id", "textZh", "textEn"],
                 },
               },
+              required: ["messages"],
             },
-            required: ["messages"],
+            maxOutputTokens: 1400,
+            temperature: 0.85,
           },
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
-          maxOutputTokens: 1400,
-          temperature: 0.85,
-        },
-      }),
-    }
-  );
+        }),
+      }
+    );
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    logLlmFallback("gemini-http", `${response.status} ${detail.slice(0, 240)}`);
-    return null;
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      logLlmFallback(`gemini-http ${model}`, `${response.status} ${detail.slice(0, 240)}`);
+      continue;
+    }
+
+    const text = extractGeminiText(await response.json());
+    if (text) return { provider: "gemini" as const, text };
+
+    logLlmFallback(`gemini-empty-response ${model}`);
   }
-  const text = extractGeminiText(await response.json());
-  if (!text) logLlmFallback("gemini-empty-response");
-  return text ? { provider: "gemini" as const, text } : null;
+
+  return null;
 }
 
 async function callOpenAI(system: string, user: string, signal: AbortSignal) {

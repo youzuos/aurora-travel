@@ -4,7 +4,7 @@
   COMPANION_STORAGE_KEY,
   COMPANION_TIMING,
 } from "../data/companion";
-import { chooseInterestWeightedAction } from "./companionBehavior";
+import { chooseInterestWeightedAction, getCompanionBehaviorProfile } from "./companionBehavior";
 import type { Lang } from "./types";
 
 export { COMPANION_STORAGE_KEY, COMPANION_TIMING };
@@ -21,6 +21,8 @@ export interface CompanionImagePayload {
   credit: string;
   captionZh: string;
   captionEn: string;
+  theme?: string;
+  query?: string;
 }
 
 export interface CompanionMessage {
@@ -33,6 +35,44 @@ export interface CompanionMessage {
   image?: CompanionImagePayload;
   voiceDurationSec?: number;
 }
+
+type CompanionLocationPhoto = {
+  src: string;
+  alt: string;
+  credit: string;
+  theme?: string;
+  query?: string;
+};
+
+const PHOTO_THEME_RULES: ReadonlyArray<{
+  keywords: readonly string[];
+  theme: string;
+}> = [
+  {
+    keywords: ["cafe", "coffee", "dessert", "food", "eat", "restaurant", "snack", "\u5496\u5561", "\u7ea2\u8c46", "\u751c", "\u997c", "\u5403", "\u9910"],
+    theme: "cafe dessert food",
+  },
+  {
+    keywords: ["temple", "shrine", "pagoda", "\u5bfa", "\u795e\u793e", "\u5854"],
+    theme: "temple pagoda",
+  },
+  {
+    keywords: ["river", "canal", "water", "lake", "\u6cb3", "\u6e56", "\u6c34", "\u8fd0\u6cb3"],
+    theme: "river canal waterside",
+  },
+  {
+    keywords: ["night", "neon", "light", "\u591c", "\u9713\u8679", "\u706f"],
+    theme: "night lights street",
+  },
+  {
+    keywords: ["blossom", "sakura", "flower", "\u6a31", "\u82b1"],
+    theme: "blossom flowers",
+  },
+  {
+    keywords: ["street", "shop", "market", "alley", "\u8857", "\u5e02\u573a", "\u5c0f\u5df7", "\u5e97"],
+    theme: "street shops alley",
+  },
+];
 
 export interface CompanionState {
   selectedCharacterId: string | null;
@@ -104,6 +144,57 @@ export function getLocation(id: string): CompanionLocation {
 
 export function getCurrentLocation(state: CompanionState): CompanionLocation {
   return getLocation(state.currentLocationId);
+}
+
+function inferPhotoTheme(location: CompanionLocation, history: readonly CompanionMessage[], seed: number, context = "") {
+  const recentText = history
+    .slice(-4)
+    .map((message) => `${message.textZh} ${message.textEn}`)
+    .join(" ")
+    .toLowerCase();
+  const value = `${context} ${recentText}`.toLowerCase();
+  const match = PHOTO_THEME_RULES.find((rule) => rule.keywords.some((keyword) => value.includes(keyword.toLowerCase())));
+
+  return match?.theme ?? location.tags[Math.abs(seed) % Math.max(1, location.tags.length)] ?? "travel";
+}
+
+function buildDynamicPhoto(location: CompanionLocation, seed: number, theme: string): CompanionLocationPhoto {
+  const queryText = `${location.cityEn} ${location.countryEn} ${theme}`;
+  const query = encodeURIComponent(queryText);
+
+  return {
+    src: `https://source.unsplash.com/1200x900/?${query}&sig=${Math.abs(seed)}`,
+    alt: `${location.cityEn} ${theme} travel photo`,
+    credit: "Unsplash city photo",
+    theme,
+    query: queryText,
+  };
+}
+
+export function pickCompanionPhoto(
+  location: CompanionLocation,
+  history: readonly CompanionMessage[],
+  seed: number,
+  context = ""
+): CompanionLocationPhoto {
+  const theme = inferPhotoTheme(location, history, seed, context);
+  if (location.photos.length < 2 || theme.includes(" ")) return buildDynamicPhoto(location, seed, theme);
+
+  const recentSrcs = new Set(
+    history
+      .slice(-8)
+      .map((message) => message.image?.src)
+      .filter((src): src is string => Boolean(src))
+  );
+  const available = location.photos.filter((photo) => !recentSrcs.has(photo.src));
+  const pool = available.length > 0 ? available : location.photos;
+
+  const photo = pool[Math.abs(seed) % pool.length];
+  return {
+    ...photo,
+    theme,
+    query: `${location.cityEn} ${location.countryEn} ${theme}`,
+  };
 }
 
 export function createAgentMessage(
@@ -204,6 +295,26 @@ function pickByCursor<T>(items: readonly T[], cursor: number): T {
   return items[Math.abs(cursor) % items.length];
 }
 
+function hasAnyTag(tags: readonly string[], needles: readonly string[]) {
+  return needles.some((needle) => tags.includes(needle));
+}
+
+function pickWeightedIntent(
+  weights: Record<Exclude<Intent, "move">, number>,
+  seed: number
+): Exclude<Intent, "move"> {
+  const entries = (Object.entries(weights) as Array<[Exclude<Intent, "move">, number]>).filter(([, weight]) => weight > 0);
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  let cursor = Math.abs(seed) % Math.max(1, total);
+
+  for (const [intent, weight] of entries) {
+    if (cursor < weight) return intent;
+    cursor -= weight;
+  }
+
+  return "status";
+}
+
 function appendMessages(history: readonly CompanionMessage[], messages: readonly CompanionMessage[]) {
   const existingIds = new Set(history.map((message) => message.id));
   const merged = [...history];
@@ -277,21 +388,64 @@ export function getCompanionLocalTimeInfo(state: CompanionState, now = Date.now(
 
 function actionForIntent(intent: Intent, state: CompanionState, now: number): CompanionAction {
   const timeInfo = getCompanionLocalTimeInfo(state, now);
-  if (timeInfo.sleeping && intent !== "move") return "sleepy";
+  const profile = getCompanionBehaviorProfile(state.selectedCharacterId);
+  const nightLeaning = hasAnyTag(profile.interestTags, ["night", "neon", "aurora", "harbor", "cold", "snow", "winter"]);
+  if (timeInfo.sleeping && !nightLeaning && intent !== "move") return "sleepy";
   if (intent === "move") return "map";
   if (intent === "photo") return "photo";
-  if (intent === "food") return timeInfo.sleeping ? "sleepy" : "food";
+  if (intent === "food") return timeInfo.sleeping && !nightLeaning ? "sleepy" : "food";
   if (intent === "people" || intent === "scenery") return "excited";
   return chooseInterestWeightedAction(state.selectedCharacterId, "idle", state.statusCursor, timeInfo.sleeping);
 }
 
 function passiveIntentForState(state: CompanionState, now: number): Exclude<Intent, "move"> {
   const timeInfo = getCompanionLocalTimeInfo(state, now);
-  if (timeInfo.sleeping) return "status";
-  if (timeInfo.meal === "breakfast" || timeInfo.meal === "lunch" || timeInfo.meal === "dinner") return "food";
-  if (state.statusCursor % 5 === 2) return "photo";
-  if (state.statusCursor % 5 === 4) return "scenery";
-  return "status";
+  const profile = getCompanionBehaviorProfile(state.selectedCharacterId);
+  const tags = profile.interestTags;
+  const actions = profile.preferredActions;
+  const nightLeaning = hasAnyTag(tags, ["night", "neon", "aurora", "harbor", "cold", "snow", "winter"]);
+  const localNight = timeInfo.hour >= 19 || timeInfo.hour < 6;
+  const mealTime = timeInfo.meal === "breakfast" || timeInfo.meal === "lunch" || timeInfo.meal === "dinner";
+  const weights: Record<Exclude<Intent, "move">, number> = {
+    status: 4,
+    food: 2,
+    photo: 2,
+    people: 1,
+    scenery: 2,
+    unknown: 0,
+  };
+
+  if (mealTime) weights.food += 3;
+  if (timeInfo.sleeping && !nightLeaning) {
+    weights.status += 6;
+    weights.food = Math.max(0, weights.food - 2);
+    weights.people = 0;
+  }
+
+  if (hasAnyTag(tags, ["photo", "camera", "details", "museum"])) weights.photo += 5;
+  if (hasAnyTag(tags, ["food", "cafe", "market", "breakfast", "chocolate", "street"])) weights.food += 5;
+  if (hasAnyTag(tags, ["people", "village", "square", "slow"])) {
+    weights.people += 3;
+    weights.status += 2;
+  }
+  if (hasAnyTag(tags, ["river", "lake", "temple", "canal", "quiet", "blossom"])) {
+    weights.scenery += 3;
+    weights.status += 1;
+  }
+  if (nightLeaning) {
+    weights.scenery += localNight ? 5 : 2;
+    weights.photo += localNight ? 4 : 2;
+    weights.status += timeInfo.sleeping ? 2 : 0;
+  }
+
+  if (actions.includes("photo")) weights.photo += 3;
+  if (actions.includes("food")) weights.food += 3;
+  if (actions.includes("map") || actions.includes("walking")) weights.status += 2;
+  if (actions.includes("excited")) weights.scenery += 2;
+  if (actions.includes("idle")) weights.status += 2;
+  if (actions.includes("sleepy")) weights.status += 2;
+
+  return pickWeightedIntent(weights, state.statusCursor + timeInfo.hour);
 }
 
 export function getCompanionAction(state: CompanionState, now = Date.now()): CompanionAction {
@@ -408,6 +562,15 @@ export function getPassiveCompanionIntent(state: CompanionState, now = Date.now(
 
 export function getCompanionVisualActionForIntent(intent: CompanionIntent, state: CompanionState, now = Date.now()) {
   return actionForIntent(intent, state, now);
+}
+
+export function getCompanionPhotoContext(state: CompanionState, now = Date.now()) {
+  const timeInfo = getCompanionLocalTimeInfo(state, now);
+  const profile = getCompanionBehaviorProfile(state.selectedCharacterId);
+  const localNight = timeInfo.hour >= 19 || timeInfo.hour < 6;
+  const nightText = localNight ? "night lights evening" : "daytime";
+
+  return `${profile.interestTags.join(" ")} ${profile.preferredActions.join(" ")} ${nightText}`;
 }
 
 export function selectCharacter(state: CompanionState, characterId: string, now = Date.now()): CompanionState {

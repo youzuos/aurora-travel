@@ -55,6 +55,21 @@ function timeMoodLabel(timeInfo: ReturnType<typeof getCompanionLocalTimeInfo>, l
 
 function replyErrorText(error: string | null, lang: Lang) {
   if (!error) return "";
+  if (error === "api_unavailable") {
+    return lang === "zh"
+      ? "聊天接口没有加载到当前代码，请刷新或重启本地服务后再试。"
+      : "The chat API is not loaded from the current app. Refresh or restart the local server and try again.";
+  }
+  if (error === "api_invalid_response") {
+    return lang === "zh"
+      ? "聊天接口返回了异常内容，请稍后再试。"
+      : "The chat API returned an unexpected response. Please try again shortly.";
+  }
+  if (error === "llm_failed") {
+    return lang === "zh"
+      ? "LLM 这次没有返回内容，可能是 Gemini 额度或限流问题，请稍后再发一次。"
+      : "The LLM did not return content this time, possibly due to Gemini quota or rate limits. Please try again shortly.";
+  }
   if (error === "llm_unconfigured") {
     return lang === "zh"
       ? "小动物现在还连不上 LLM，所以不会用本地模板代替回复。请先配置 GEMINI_API_KEY 或 OPENAI_API_KEY。"
@@ -63,6 +78,27 @@ function replyErrorText(error: string | null, lang: Lang) {
   return lang === "zh"
     ? "小动物这次没有生成成功，请稍后再发一次。"
     : "The companion could not generate a reply this time. Please try again shortly.";
+}
+
+async function readCompanionReply(response: Response) {
+  const text = await response.text();
+  if (!text.trim()) return {};
+
+  try {
+    return JSON.parse(text) as {
+      error?: string;
+      state?: CompanionState;
+      messages?: CompanionMessage[];
+    };
+  } catch {
+    return {
+      error: response.status === 404 ? "api_unavailable" : "api_invalid_response",
+    } as {
+      error?: string;
+      state?: CompanionState;
+      messages?: CompanionMessage[];
+    };
+  }
 }
 
 function PhotoCard({ message, lang, onMediaLoad }: { message: CompanionMessage; lang: Lang; onMediaLoad?: () => void }) {
@@ -175,11 +211,7 @@ export default function CompanionChat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: text, state: baseState, lang, now }),
       });
-      const result = (await response.json()) as {
-        error?: string;
-        state?: CompanionState;
-        messages?: CompanionMessage[];
-      };
+      const result = await readCompanionReply(response);
       if (!response.ok) {
         if (result.state) onStateChange(result.state);
         setReplyError(result.error ?? "llm_failed");

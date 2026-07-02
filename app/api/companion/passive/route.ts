@@ -4,9 +4,11 @@ import {
   appendCompanionMessages,
   createAgentMessage,
   createDefaultCompanionState,
+  getCompanionPhotoContext,
   getCompanionVisualActionForIntent,
   getCurrentLocation,
   getPassiveCompanionIntent,
+  pickCompanionPhoto,
   type CompanionState,
 } from "../../../../lib/companion";
 import {
@@ -41,7 +43,14 @@ export async function POST(request: Request) {
   const passiveIntent = advanced.moved ? "status" : getPassiveCompanionIntent(activeState, now);
   const location = getCurrentLocation(activeState);
   const photo =
-    passiveIntent === "photo" ? location.photos[Math.abs(activeState.statusCursor) % location.photos.length] : null;
+    passiveIntent === "photo"
+      ? pickCompanionPhoto(
+          location,
+          activeState.messageHistory,
+          now + activeState.statusCursor,
+          getCompanionPhotoContext(activeState, now)
+        )
+      : null;
   const message = createAgentMessage(
     passiveIntent === "photo" ? "image" : passiveIntent === "scenery" ? "voice" : "text",
     "",
@@ -51,13 +60,15 @@ export async function POST(request: Request) {
       ...(passiveIntent === "scenery" ? { voiceDurationSec: 8 } : {}),
       ...(photo
         ? {
-            image: {
-              src: photo.src,
-              alt: photo.alt,
-              credit: photo.credit,
-              captionZh: "",
-              captionEn: "",
-            },
+	            image: {
+	              src: photo.src,
+	              alt: photo.alt,
+	              credit: photo.credit,
+	              theme: photo.theme,
+	              query: photo.query,
+	              captionZh: "",
+	              captionEn: "",
+	            },
           }
         : {}),
     }
